@@ -26,6 +26,13 @@
 #include "../memory.h"
 #include "../yabause.h"
 
+/* libogc-v3-backup arrastra tuxedo/ppc/spr.h que define DAR/SAR/etc como
+   registros PPC. El Saturn usa esos nombres para registros DMA. Los liberamos. */
+#undef DAR
+#undef SAR
+#undef DSR
+#undef DBR
+
 SH2_struct *MSH2=NULL;
 SH2_struct *SSH2=NULL;
 SH2_struct *CurrentSH2;

@@ -7,6 +7,7 @@
 #include "ogc/video.h"
 #include <malloc.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 
 extern void jit_exit();

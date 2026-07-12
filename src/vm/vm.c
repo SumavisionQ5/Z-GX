@@ -28,6 +28,13 @@
 #include <ogc/aram.h>
 #include "vm.h"
 
+/* libogc-v3-backup: tuxedo/ppc/spr.h define DSISR/DAR/etc como regs PPC.
+   vm.c los usa como nombres de parametro. Los liberamos. */
+#undef DSISR
+#undef DAR
+#undef SAR
+#undef DSR
+
 #include <stdio.h>
 
 typedef u8 vm_page[PAGE_SIZE];
@@ -55,7 +62,7 @@ u32 VM_PteChangedBit(PTE* p)
 		p->C = 0;
 		asm volatile("tlbie %0 \n\t"
 					"tlbsync \n\t"
-					"ptesync"
+					"sync"
 					:: "r"(p));
 	}
 	return c;

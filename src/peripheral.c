@@ -24,6 +24,7 @@
 #include <wiiuse/wpad.h>
 #include <ogc/n64.h>
 
+
 PerPad perpad[PER_PADMAX];
 u32 pad_status = 0;
 PerData per_data;

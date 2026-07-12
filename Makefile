@@ -14,6 +14,7 @@ endif
 
 include $(DEVKITPRO)/libogc2/wii_rules
 
+
 #---------------------------------------------------------------------------------
 # TARGET is the name of the output
 # BUILD is the directory where object files & intermediate files will be placed

@@ -311,6 +311,7 @@ static int charToEscape(char *buffer) {
 }
 
 #ifndef WIN32
+
 static FILE* fopenInPath(char* filename, char* path){
   int nbFiles,i,k;
   char* tmp;

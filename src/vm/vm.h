@@ -137,7 +137,7 @@ int VM_mmap_pte(PTE **pte_arr, void *mem, u32 virtual, size_t size);
 int VM_MemMap(void *mem, u32 virtual, size_t size, u32 PP);
 #endif
 
-void VM_BATSet(u32 bat_id, void *mem, u32 virtual, size_t size);
+void VM_BATSet(u32 bat_id, void *mem, u32 virtual, u32 bl_size_enc);
 void VM_BATGet(BAT *bats);
 void VM_BATClear(void);
 

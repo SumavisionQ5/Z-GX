@@ -609,7 +609,7 @@ static u32 __SGX_Vdp1SetMode(u32 w, u32 h)
 			SGX_SetTex(chr_addr, GX_TF_CI4, spr_w, spr_h, TLUT_FMT_RGB565 | TLUT_INDX_CLRBANK);
 			SGX_SpriteConverterSet(w, SPRITE_4BPP, vdp1cmd->SRCA & 3);
 			return colr & 0xFFF0;
-		case 1: // LUT 4-bit
+		case 1: { // LUT 4-bit
 			u32 colorlut = (colr << 3) & 0x7FFFF;
 			//Check for colorbanking...
 
@@ -638,6 +638,7 @@ static u32 __SGX_Vdp1SetMode(u32 w, u32 h)
 			SGX_SetTex(chr_addr, GX_TF_CI4, spr_w, spr_h, TLUT_FMT_RGB5A3 | TLUT_INDX_IMM4);
 			SGX_SpriteConverterSet(w, SPRITE_4BPP, vdp1cmd->SRCA & 3);
 			return 0;
+                } // fin case 1 (scope para declaraciones)
 		case 2: // Colorbank 6-bit
 		case 3: // Colorbank 7-bit
 		case 4: // Colorbank 8-bit

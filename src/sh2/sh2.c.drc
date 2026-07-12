@@ -990,7 +990,6 @@ u16* sh2_GetPCAddr(u32 pc)
 	//if (pc == dol_breakpoint) {
 	//	dol_breakpoint_val = pc;
 	//}
-	pc &= 0x0FFFFFFF;	//Fix: enmascarar region espejo SH2 cache-through -> evita DSI
 
 	switch((pc >> 20) & 0xFF) {
 		case 0x000: // Bios
@@ -1017,7 +1016,7 @@ u16* sh2_GetPCAddr(u32 pc)
 		case 0x06F:
 			return (u16*) (wram + LOW_WRAM_SIZE + (pc & (HIGH_WRAM_SIZE - 1)));
 		default: // Invalid
-			return (u16*) wram;  //Fix: evitar DSI en dir invalida
+			return (u16*) (0xDEADBEEF);
 	}
 	return 0;
 }

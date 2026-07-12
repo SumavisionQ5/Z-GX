@@ -55,12 +55,12 @@ void musashi_SetReadW(M68K_READ *func);
 void musashi_SetWriteB(M68K_WRITE *func);
 void musashi_SetWriteW(M68K_WRITE *func);
 //Implementation for musashi read/write functions
-u32 m68k_read_memory_8(u32 address);
-u32 m68k_read_memory_16(u32 address);
-u32 m68k_read_memory_32(u32 address);
-void m68k_write_memory_8(u32 address, u32 value);
-void m68k_write_memory_16(u32 address, u32 value);
-void m68k_write_memory_32(u32 address, u32 value);
+unsigned int m68k_read_memory_8(unsigned int address);
+unsigned int m68k_read_memory_16(unsigned int address);
+unsigned int m68k_read_memory_32(unsigned int address);
+void m68k_write_memory_8(unsigned int address, unsigned int value);
+void m68k_write_memory_16(unsigned int address, unsigned int value);
+void m68k_write_memory_32(unsigned int address, unsigned int value);
 
 
 #endif

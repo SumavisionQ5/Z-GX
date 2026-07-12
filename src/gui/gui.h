@@ -72,7 +72,7 @@ typedef struct GuiAnim {
 } GuiAnim;
 
 
-typedef struct GuiAnim {
+typedef struct GuiItem {
 	u32 type;
 	u32 color_fg;
 	u32 value;
