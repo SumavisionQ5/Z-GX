@@ -311,7 +311,6 @@ static int charToEscape(char *buffer) {
 }
 
 #ifndef WIN32
-
 static FILE* fopenInPath(char* filename, char* path){
   int nbFiles,i,k;
   char* tmp;
@@ -366,6 +365,16 @@ static FILE* OpenFile(char* buffer, const char* cue) {
    int tmp;
    FILE *ret_file = NULL;
 
+#if defined(ANDROID)
+  if (strstr(cue, "/proc/self/fd/") == cue) {
+     char * fdname = GetFileDescriptorPath(buffer);
+     if( fdname == NULL ){
+      YabSetError(YAB_ERR_FILENOTFOUND, buffer);
+      return -1;
+     }
+     ret_file = fopen(fdname, "rb");
+  }else{
+#endif
    // Now go and open up the image file, figure out its size, etc.
    if ((ret_file = fopen(buffer, "rb")) == NULL)
    {
@@ -403,6 +412,9 @@ static FILE* OpenFile(char* buffer, const char* cue) {
          YabSetError(YAB_ERR_FILENOTFOUND, buffer);
       }
    }
+#if defined(ANDROID)
+  }
+#endif
    return ret_file;
 }
 
@@ -524,6 +536,18 @@ static int LoadBinCue(const char *cuefilename, FILE *iso_file)
 
 
   // check if File deskmode or not
+#if defined(ANDROID)
+  if (strstr(cuefilename, "/proc/self/fd/") == cuefilename) {
+     char * fdname = GetFileDescriptorPath(temp_buffer);
+     if( fdname == NULL ){
+      YabSetError(YAB_ERR_FILENOTFOUND, temp_buffer);
+      free(temp_buffer);
+      return -1;
+     }
+
+     bin_file = fopen(fdname, "rb");
+  }else{
+#endif
   // Now go and open up the image file, figure out its size, etc.
   if ((bin_file = fopen(temp_buffer, "rb")) == NULL)
   {
@@ -581,6 +605,9 @@ static int LoadBinCue(const char *cuefilename, FILE *iso_file)
       return -1;
     }
   }
+#if defined(ANDROID)
+  }
+#endif
 
   fseek(bin_file, 0, SEEK_END);
   file_size = ftell(bin_file);
@@ -850,6 +877,9 @@ void BuildTOC()
    isoTOC[101] = (isoTOC[session->track_num - 1] & 0xFF000000) | session->fad_end;
 }
 
+#if (defined(IOS) || defined(ANDROID))
+#define stricmp strcasecmp
+#endif
 //////////////////////////////////////////////////////////////////////////////
 
 static int ISOCDInit(const char * iso) {
@@ -861,6 +891,7 @@ static int ISOCDInit(const char * iso) {
    memset(isoTOC, 0xFF, 0xCC * 2);
    memset(&disc, 0, sizeof(disc));
    iso_cd_status = 0;
+   {FILE*_f=fopen("sd:/chd.txt","a");if(_f){fprintf(_f,"ISOCDInit: %s\n",iso?iso:"(null)");fclose(_f);}}
 
    if (!iso)
       return -1;
@@ -898,6 +929,7 @@ static int ISOCDInit(const char * iso) {
      else if (stricmp(ext, ".CHD") == 0)
      {
        // It's a CHD
+       {FILE*_f=fopen("sd:/chd.txt","a");if(_f){fprintf(_f,"LoadCHD por extension: %s\n",iso);fclose(_f);}}
        imgtype = IMG_CHD;
        ret = LoadCHD(iso, iso_file);
      }
@@ -1108,6 +1140,7 @@ int checkCHD(const char *filename ) {
 
   chd_file *chd;
   chd_error error = chd_open(filename, CHD_OPEN_READ, NULL, &chd);
+  {FILE*_f=fopen("sd:/chd.txt","a");if(_f){fprintf(_f,"chd_open %s -> err=%d\n",filename,(int)error);fclose(_f);}}
   if (error != CHDERR_NONE) {
     return -1;
   }
@@ -1147,6 +1180,7 @@ static int LoadCHD(const char *chd_filename, FILE *iso_file)
   int num_tracks = 0;
 
   chd_error error = chd_open(chd_filename, CHD_OPEN_READ, NULL, &pChdInfo->chd);
+  {FILE*_f=fopen("sd:/chd.txt","a");if(_f){fprintf(_f,"LoadCHD: buf=%p chd_open err=%d\n",(void*)buf,(int)error);fclose(_f);}}
   if (error != CHDERR_NONE) {
     return -1;
   }

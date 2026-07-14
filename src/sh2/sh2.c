@@ -214,6 +214,7 @@ void sh2_HandleInterrupt(SH2 *sh)
 			sh->r[15] -= 8;
 			sh->sr = SH2_SR_SET_I(sh->sr, level);
 			sh->pc = sh2_Read32(sh->vbr + (vec << 2));
+	{u32 _npc=sh2_Read32(sh->vbr + (vec << 2)); if(_npc<0x100 || (_npc>=0x07000000 && _npc<0x20000000)){FILE*_f=fopen("sd:/irqbad.txt","a");if(_f){fprintf(_f,"BAD vec=%02X lvl=%X oldpc=%08X r15=%08X vbr=%08X newpc=%08X\n",(unsigned)vec,(unsigned)level,(unsigned)sh->pc,(unsigned)sh->r[15],(unsigned)sh->vbr,(unsigned)_npc);fclose(_f);}}}
 			--sh->iqr_count;
 			SH2_FLAG_CLR(sh, SH2_FLAG_IDLE | SH2_FLAG_SLEEPING);
 		}
