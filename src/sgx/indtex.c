@@ -188,34 +188,10 @@ static u32 __indtex16bppGen(u16 *data, u32 n, u32 align)
 	return tile_cnt;	//Return the number of bytes stored
 }
 
-
 void SGX_InitSpriteConv(void)
 {
 	ind_addr = 0;
 
-}
-
-void __genConverter(SGXTexPre *tex, u32 width, u32 bpp_id, u32 align)
-{
-	u32 tile_cnt;
-	tex->addr = preloadtex_addr | (0x200000 | 0xD8000);
-	tex->attr = TEX_ATTR(GX_CLAMP, GX_REPEAT);
-	//Check bpp to generate texture
-	if (bpp_id == SPRITE_4BPP) {
-		tile_cnt = __indtex4bppGen((u16*)(indtex_data + ind_addr), width, align);
-		tex->fmt = TEX_FMT(GX_TF_IA8, width, 8);
-	} else {
-		// 8bpp is the same as 16bpp if the width is doubled
-		width <<= bpp_id == SPRITE_16BPP;
-		tile_cnt = __indtex8bppGen((u16*)(indtex_data + ind_addr), width, align);
-		tex->fmt = TEX_FMT(GX_TF_IA8, width, 4);
-	}
-	DCStoreRange(indtex_data + ind_addr, tile_cnt * 32);
-	//TODO: Directly load usign BP Registers
-	SGX_PreloadTex(indtex_data + ind_addr, tex->addr, TEXPRE_TYPE_16BPP | tile_cnt);
-	ind_addr += tile_cnt * 32;
-	ind_addr = (ind_addr > 0x7C00 ? 0 : ind_addr);
-	preloadtex_addr += tile_cnt;
 }
 
 //Uses the sprite size (from 0 to 62) to make use of indirect textrue conversion
@@ -229,7 +205,25 @@ void SGX_SpriteConverterSet(u32 width, u32 bpp_id, u32 align)
 		u32 t = (bpp_id << 8) + (align << 6) + width;
 		SGXTexPre *tex = indtex_arr + t;
 		if (!tex->addr) {
-			__genConverter(tex, width, bpp_id, align);
+			u32 tile_cnt;
+			tex->addr = preloadtex_addr | (0x200000 | 0xD8000);
+			tex->attr = TEX_ATTR(GX_CLAMP, GX_REPEAT);
+			//Check bpp to generate texture
+			if (bpp_id == SPRITE_4BPP) {
+				tile_cnt = __indtex4bppGen((u16*)(indtex_data + ind_addr), width, align);
+				tex->fmt = TEX_FMT(GX_TF_IA8, width, 8);
+			} else {
+				// 8bpp is the same as 16bpp if the width is doubled
+				width <<= bpp_id == SPRITE_16BPP;
+				tile_cnt = __indtex8bppGen((u16*)(indtex_data + ind_addr), width, align);
+				tex->fmt = TEX_FMT(GX_TF_IA8, width, 4);
+			}
+			DCStoreRange(indtex_data + ind_addr, tile_cnt * 32);
+			//TODO: Directly load usign BP Registers
+			SGX_PreloadTex(indtex_data + ind_addr, tex->addr, TEXPRE_TYPE_16BPP | tile_cnt);
+			ind_addr += tile_cnt * 32;
+			ind_addr = (ind_addr > 0x7C00 ? 0 : ind_addr);
+			preloadtex_addr += tile_cnt;
 		}
 		SGX_SetTexPreloaded(GX_TEXMAP7, tex);
 		GX_SetTevIndirect(GX_TEVSTAGE0, GX_INDTEXSTAGE0, GX_ITF_8, GX_ITB_ST, GX_ITM_0 + (bpp_id >> 1), GX_ITW_OFF, GX_ITW_OFF, GX_FALSE, GX_FALSE, GX_ITBA_OFF);
@@ -268,25 +262,12 @@ static const u16 indtex_16x2cell[] ATTRIBUTE_ALIGN(32) = {
 };
 
 enum IndCell {
-	//CELL FORMAT
 	INDTEX_CELL_8x2,
 	INDTEX_CELL_16x1,
-	INDTEX_CELL_16x2,
-	INDTEX_CELL_32x1,
-	INDTEX_CELL_32x2,
-
-	//BITMAP FORMAT
-	INDTEX_BITMAP_4x512,	// 4bpp
-	INDTEX_BITMAP_4x1024,
-	INDTEX_BITMAP_8x512,	// 8bpp
-	INDTEX_BITMAP_8x1024,
-	INDTEX_BITMAP_16x512,	// 16bpp
-	INDTEX_BITMAP_16x1024,
-	INDTEX_BITMAP_32x512,	// 32bpp
-	INDTEX_BITMAP_32x1024
+	INDTEX_CELL_16x2
 };
 
-SGXTexPre indtex_cell[16] = {
+SGXTexPre indtex_cell[8] = {
 	{.addr = (0x7FF00 >> 5) | (0x200000 | 0xD8000), .fmt = TEX_FMT(GX_TF_IA8, 2, 2), .attr = TEX_ATTR(GX_CLAMP, GX_REPEAT)},
 	{.addr = (0x7FF20 >> 5) | (0x200000 | 0xD8000), .fmt = TEX_FMT(GX_TF_IA8, 2, 4), .attr = TEX_ATTR(GX_CLAMP, GX_REPEAT)},
 	{.addr = (0x7FF40 >> 5) | (0x200000 | 0xD8000), .fmt = TEX_FMT(GX_TF_IA8, 4, 8), .attr = TEX_ATTR(GX_CLAMP, GX_REPEAT)},
@@ -297,14 +278,6 @@ void SGX_CellConverterInit(void)
 	SGX_PreloadTex(indtex_8x2cell , indtex_cell[INDTEX_CELL_8x2].addr, TEXPRE_TYPE_16BPP | 1);
 	SGX_PreloadTex(indtex_16x1cell, indtex_cell[INDTEX_CELL_16x1].addr, TEXPRE_TYPE_16BPP | 1);
 	SGX_PreloadTex(indtex_16x2cell, indtex_cell[INDTEX_CELL_16x2].addr, TEXPRE_TYPE_16BPP | 2);
-
-	//Generate the Bitmap Converters
-	__genConverter(&indtex_cell[INDTEX_BITMAP_4x512], (512-8)/8, SPRITE_4BPP, 0);
-	__genConverter(&indtex_cell[INDTEX_BITMAP_8x512], (512-8)/8, SPRITE_8BPP, 0);
-	__genConverter(&indtex_cell[INDTEX_BITMAP_16x512], (512-8)/8, SPRITE_16BPP, 0);
-
-	//Same indirect texture
-	//__genConverter(&indtex_cell[INDTEX_BITMAP_32x512], width, bpp_id, align);
 }
 
 void SGX_CellConverterSet(u32 cellsize, u32 bpp_id)
@@ -322,20 +295,5 @@ void SGX_CellConverterSet(u32 cellsize, u32 bpp_id)
 		GX_SetIndTexOrder(GX_INDTEXSTAGE0, GX_TEXCOORD0, GX_TEXMAP7);
 		GX_SetIndTexCoordScale(GX_INDTEXSTAGE0, GX_ITS_4, GX_ITS_1);
 	}
-	//TODO: Handle Cell 32BPP (1x1 and 2x2)
-}
-
-u32 SGX_BitmapConverterSet(u32 width, u32 bpp_id)
-{
-	SGXTexPre *indtex = &indtex_cell[INDTEX_BITMAP_4x512 + (bpp_id << 1) + width];
-	//TODO: We should be able to handle all cases here...
-	if (!indtex->addr) {
-		return 0;
-	}
-	GX_SetNumIndStages(1);
-	SGX_SetTexPreloaded(GX_TEXMAP7, indtex);
-	GX_SetTevIndirect(GX_TEVSTAGE0, GX_INDTEXSTAGE0, GX_ITF_8, GX_ITB_ST, GX_ITM_0 + (bpp_id >> 1), GX_ITW_OFF, GX_ITW_OFF, GX_FALSE, GX_FALSE, GX_ITBA_OFF);
-	GX_SetIndTexOrder(GX_INDTEXSTAGE0, GX_TEXCOORD0, GX_TEXMAP7);
-	GX_SetIndTexCoordScale(GX_INDTEXSTAGE0, GX_ITS_8 - (bpp_id >> 1), GX_ITS_1);
-	return 1;
+	//TODO: Handle Cell 16BPP (1x1 and 2x2)
 }

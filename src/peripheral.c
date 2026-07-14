@@ -20,6 +20,7 @@
 
 #include "debug.h"
 #include "peripheral.h"
+#include "memory.h"
 #include <ogcsys.h>
 #include <wiiuse/wpad.h>
 #include <ogc/n64.h>
@@ -143,6 +144,7 @@ static void per_GCToSat(u32 indx, u32 *exit_code)
 	//Use C-stick as another button
 	btns |=  (u32) ((perpad[indx].sy > 32) | (perpad[indx].sy < -32)) << GC_BIT_Z2;
 	*exit_code |= (btns & (PAD_BUTTON_START | PAD_TRIGGER_Z)) == (PAD_BUTTON_START | PAD_TRIGGER_Z);
+	if ((btns & (PAD_TRIGGER_L | PAD_TRIGGER_R | PAD_TRIGGER_Z)) == (PAD_TRIGGER_L | PAD_TRIGGER_R | PAD_TRIGGER_Z)) dump_memory();
 
 	//TODO: get the user defined bits for the buttons
 	u32 sat_btns =

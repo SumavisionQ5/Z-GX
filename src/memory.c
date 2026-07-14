@@ -968,7 +968,6 @@ s32 num_dumps = 0;
 
 void dump_memory(void)
 {
-	return;
 	if (num_dumps > 0) {
 		return;
 	}
@@ -994,7 +993,7 @@ void dump_memory(void)
 	fwrite("SoundRam........", 16, 1, fp);
 	fwrite(SoundRam, 0x80000, 1, fp);
 	fwrite("VDP2RAM.........", 16, 1, fp);
-	fwrite(Vdp2Ram, sizeof(Vdp2), 1, fp);
+	fwrite(Vdp2Ram, 0x80000, 1, fp);
 	fwrite("VDP2CRAM........", 16, 1, fp);
 	fwrite(Vdp2ColorRam, 0x1000, 1, fp);
 	fwrite("MSH2OnChip......", 16, 1, fp);
