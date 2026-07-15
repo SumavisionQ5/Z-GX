@@ -292,7 +292,7 @@ void Vdp2HBlankIN(void) {
    /* I'm not 100% sure about this, but it seems that when using manual change
    we should swap framebuffers in the "next field" and thus, clear the CEF...
    now we're lying a little here as we're not swapping the framebuffers. */
-   if (Vdp1External.manualchange) Vdp1Regs->EDSR >>= 1;
+   //FIX freeze: shift movido a VBlankOUT (antes corria por cada HBlank arrasando el EDSR)
    Vdp2Regs->TVSTAT |= 0x0004;
    ScuSendHBlankIN();
 
@@ -371,6 +371,7 @@ void Vdp2VBlankOUT(void)
 #if 0
 	osd_ProfDraw();
 #endif
+	if (Vdp1External.manualchange) Vdp1Regs->EDSR >>= 1; //FIX freeze: shift una vez por frame
 	SGX_Vdp1SwapFramebuffer();
 	SVI_SwapBuffers((u32) ticks_to_millisecs((gettime() - current_ticks)) < 16);
 
