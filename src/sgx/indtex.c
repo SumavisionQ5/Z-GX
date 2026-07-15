@@ -198,6 +198,7 @@ void SGX_InitSpriteConv(void)
 void SGX_SpriteConverterSet(u32 width, u32 bpp_id, u32 align)
 {
 	//If width is greater than 8 pixels or is using 16bpp
+	{static int _sc=0; if(_sc<60 && width>20){FILE*_f=fopen("sd:/spr.txt","a");if(_f){fprintf(_f,"w=%u bpp=%u al=%u\n",(unsigned)width,(unsigned)bpp_id,(unsigned)align);fclose(_f);}_sc++;}}
 	u32 use_indirect = (width + align + (bpp_id & SPRITE_16BPP)) > 1;
 	GX_SetNumIndStages(use_indirect);
 	if (use_indirect) {
@@ -216,7 +217,7 @@ void SGX_SpriteConverterSet(u32 width, u32 bpp_id, u32 align)
 				// 8bpp is the same as 16bpp if the width is doubled
 				width <<= bpp_id == SPRITE_16BPP;
 				tile_cnt = __indtex8bppGen((u16*)(indtex_data + ind_addr), width, align);
-				tex->fmt = TEX_FMT(GX_TF_IA8, width, 4);
+				tex->fmt = TEX_FMT(GX_TF_IA8, (width + 3) & ~3u, 4); //FIX rayas: alinear ancho a tile
 			}
 			DCStoreRange(indtex_data + ind_addr, tile_cnt * 32);
 			//TODO: Directly load usign BP Registers

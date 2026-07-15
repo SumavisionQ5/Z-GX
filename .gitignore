@@ -6,3 +6,5 @@
 /*.dol
 /*.elf
 /src/*.old
+*.bin
+*.txt
