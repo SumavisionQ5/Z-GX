@@ -214,7 +214,6 @@ void sh2_HandleInterrupt(SH2 *sh)
 			sh->r[15] -= 8;
 			sh->sr = SH2_SR_SET_I(sh->sr, level);
 			sh->pc = sh2_Read32(sh->vbr + (vec << 2));
-	{u32 _npc=sh2_Read32(sh->vbr + (vec << 2)); if(_npc<0x100 || (_npc>=0x07000000 && _npc<0x20000000)){FILE*_f=fopen("sd:/irqbad.txt","a");if(_f){fprintf(_f,"BAD vec=%02X lvl=%X oldpc=%08X r15=%08X vbr=%08X newpc=%08X\n",(unsigned)vec,(unsigned)level,(unsigned)sh->pc,(unsigned)sh->r[15],(unsigned)sh->vbr,(unsigned)_npc);fclose(_f);}}}
 			--sh->iqr_count;
 			SH2_FLAG_CLR(sh, SH2_FLAG_IDLE | SH2_FLAG_SLEEPING);
 		}
@@ -286,6 +285,28 @@ void sh2_NMI(SH2 *sh)
 	sh2_SetInterrupt(sh, 0xB, 0x10);
 }
 
+//FIX cache stale: bitmap de paginas (1KB) de WRAM con codigo compilado
+u8 drc_code_pages[2048]; //2MB WRAM / 1KB por pagina = 2048 paginas
+static inline u32 __PageIdx(u32 addr)
+{
+	addr &= 0x0FFFFFFF;
+	if ((addr >> 20) == 0x060 || ((addr >> 20) >= 0x060 && (addr >> 20) <= 0x07F)) return 1024 + ((addr >> 10) & 0x3FF); //HWRAM
+	if ((addr >> 20) == 0x002) return (addr >> 10) & 0x3FF; //LWRAM
+	return 0xFFFFFFFF;
+}
+void drc_MarkCodePage(u32 addr)
+{
+	u32 p = __PageIdx(addr);
+	if (p != 0xFFFFFFFF) drc_code_pages[p] = 1;
+}
+void drc_CheckWrite(u32 addr)
+{
+	u32 p = __PageIdx(addr);
+	if (p != 0xFFFFFFFF && drc_code_pages[p]) {
+		HashClearRange(addr & ~0x3FFu, (addr & ~0x3FFu) + 0x400);
+		drc_code_pages[p] = 0;
+	}
+}
 void sh2_WriteNotify(u32 start, u32 len)
 {
 	HashClearRange(start, start + len);
@@ -911,6 +932,7 @@ u32 sh2_Read32(u32 addr)
 
 void sh2_Write8(u32 addr, u8 val)
 {
+	drc_CheckWrite(addr);
 	switch(addr >> 29) {
 		case 0x1:	//Cache-through area
 		case 0x5:	sh_ctx->cycles += mem_CyclesW(addr);
@@ -933,6 +955,7 @@ void sh2_Write8(u32 addr, u8 val)
 
 void sh2_Write16(u32 addr, u16 val)
 {
+	drc_CheckWrite(addr);
 	switch(addr >> 29) {
 		case 0x1:	//Cache-through area
 		case 0x5:	sh_ctx->cycles += mem_CyclesW(addr);
@@ -955,6 +978,7 @@ void sh2_Write16(u32 addr, u16 val)
 
 void sh2_Write32(u32 addr, u32 val)
 {
+	drc_CheckWrite(addr);
 	switch(addr >> 29) {
 		case 0x1:	//Cache-through area
 		case 0x5:	sh_ctx->cycles += mem_CyclesW(addr);
@@ -975,46 +999,10 @@ void sh2_Write32(u32 addr, u32 val)
 	}
 }
 
-#define MAX_PREV 1024
-static u32 dol_prev_pos = 0;
-static u32 dol_prev[MAX_PREV];
-static u32 dol_trap_done = 0;
-static u32 exec_prev[1024];
-static u32 exec_pos = 0;
-static u32 exec_trap = 0;
-static u32 exec_total = 0;
-void trace_exec(u32 pc)
-{
-	exec_prev[exec_pos] = pc;
-	exec_pos = (exec_pos+1) & 1023; ++exec_total;
-	if (pc < 0x200 && !exec_trap && exec_total > 5000) {
-		exec_trap = 1;
-		FILE *_f = fopen("sd:/exec.txt","w");
-		if (_f) {
-			fprintf(_f,"EXEC TRAP pc=%08X\nMSH2 pc=%08X pr=%08X r15=%08X\nSSH2 pc=%08X pr=%08X r15=%08X\nULTIMOS BLOQUES EJECUTADOS:\n",(unsigned)pc,(unsigned)msh2.pc,(unsigned)msh2.pr,(unsigned)msh2.r[15],(unsigned)ssh2.pc,(unsigned)ssh2.pr,(unsigned)ssh2.r[15]);
-			for (u32 _i = 1024-64; _i < 1024; ++_i) fprintf(_f,"%08X\n",(unsigned)exec_prev[(exec_pos + _i) & 1023]);
-			fclose(_f);
-		}
-	}
-}
 
 u16* sh2_GetPCAddr(u32 pc)
 {
 	//Debug
-	dol_prev[dol_prev_pos] = pc;
-	dol_prev_pos = (dol_prev_pos+1) & (MAX_PREV-1);
-	if (pc < 0x200 && !dol_trap_done && dol_prev_pos > 64) {
-		dol_trap_done = 1;
-		FILE *_f = fopen("sd:/trap2.txt","w");
-		if (_f) {
-			fprintf(_f,"TRAP pc=%08X\nMSH2: pc=%08X pr=%08X r15=%08X sr=%08X delay=%u\n",(unsigned)pc,(unsigned)msh2.pc,(unsigned)msh2.pr,(unsigned)msh2.r[15],(unsigned)msh2.sr,(unsigned)msh2.delay_slot);
-			fprintf(_f,"SSH2: pc=%08X pr=%08X r15=%08X sr=%08X delay=%u\n",(unsigned)ssh2.pc,(unsigned)ssh2.pr,(unsigned)ssh2.r[15],(unsigned)ssh2.sr,(unsigned)ssh2.delay_slot);
-			for (u32 _i = 0; _i < 16; ++_i) fprintf(_f,"M r%u=%08X S r%u=%08X\n",(unsigned)_i,(unsigned)msh2.r[_i],(unsigned)_i,(unsigned)ssh2.r[_i]);
-			fprintf(_f,"ULTIMOS BLOQUES NUEVOS:\n");
-			for (u32 _i = MAX_PREV-48; _i < MAX_PREV; ++_i) fprintf(_f,"%08X\n",(unsigned)dol_prev[(dol_prev_pos + _i) & (MAX_PREV-1)]);
-			fclose(_f);
-		}
-	}
 	////if (pc_prev_unreached == 0x0601C6DA && key == pc_breakpoint) {
 	//if (pc == dol_breakpoint) {
 	//	dol_breakpoint_val = pc;

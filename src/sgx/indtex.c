@@ -198,7 +198,6 @@ void SGX_InitSpriteConv(void)
 void SGX_SpriteConverterSet(u32 width, u32 bpp_id, u32 align)
 {
 	//If width is greater than 8 pixels or is using 16bpp
-	{static int _sc=0; if(_sc<60 && width>20){FILE*_f=fopen("sd:/spr.txt","a");if(_f){fprintf(_f,"w=%u bpp=%u al=%u\n",(unsigned)width,(unsigned)bpp_id,(unsigned)align);fclose(_f);}_sc++;}}
 	u32 use_indirect = (width + align + (bpp_id & SPRITE_16BPP)) > 1;
 	GX_SetNumIndStages(use_indirect);
 	if (use_indirect) {

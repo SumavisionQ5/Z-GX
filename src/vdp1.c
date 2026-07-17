@@ -209,7 +209,7 @@ u8 FASTCALL Vdp1ReadByte(u32 addr) {
 u16 FASTCALL Vdp1ReadWord(u32 addr) {
    switch(addr & 0xFF) {
       case 0x10:
-        { static u32 _ec=0; static u16 _lv=0xFFFF; if (Vdp1Regs->EDSR == _lv) { ++_ec; } else { _ec = 0; _lv = Vdp1Regs->EDSR; } if (_ec == 100000) { FILE*_f=fopen("sd:/edsr.txt","a"); if(_f){ fprintf(_f,"SPIN EDSR=%u FBCR=%u PTMR=%u TVMR=%u\n",(unsigned)Vdp1Regs->EDSR,(unsigned)Vdp1Regs->FBCR,(unsigned)Vdp1Regs->PTMR,(unsigned)Vdp1Regs->TVMR); fclose(_f);} } return Vdp1Regs->EDSR; }
+        return Vdp1Regs->EDSR;
       case 0x12:
         return Vdp1Regs->LOPR;
       case 0x14:

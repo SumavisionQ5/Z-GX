@@ -1395,6 +1395,7 @@ u16* _jit_GenIFCBlock(u32 addr)
 	block_data.ld_regs = ld_regs;
 	block_data.instr_count = instr_count;
 	block_data.entry_addr = entry_addr;
+	{ extern void drc_MarkCodePage(u32); drc_MarkCodePage(entry_addr); drc_MarkCodePage(curr_pc); } //FIX cache stale: marcar paginas del bloque
 
 	return ret_ptr;
 }

@@ -75,14 +75,6 @@ FUNC_START(jit_endblock_test)
 	stw r4, (25*4)(r31)				//store cycles
 	bc 0b00100, 0, jit_exit			//move to JIT exit if cycles >= 0
 	lwz r3, (17*4)(r31)				//get the next block form PC
-	mflr r0
-	stwu r1, -16(r1)
-	stw r0, 12(r1)
-	bl trace_exec
-	lwz r0, 12(r1)
-	addi r1, r1, 16
-	mtlr r0
-	lwz r3, (17*4)(r31)
 	bl HashGet
 	lwz r4, (17*4)(r31)				//reload PC if block was not found
 	lis r5, _jit_GenBlock@ha		//load _jit_GenBlock()

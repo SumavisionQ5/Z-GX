@@ -371,7 +371,6 @@ void Vdp2VBlankOUT(void)
 #if 0
 	osd_ProfDraw();
 #endif
-	{ extern void HashClearAll(void); HashClearAll(); } //TEST teoria cache stale
 	SGX_Vdp1SwapFramebuffer();
 	SVI_SwapBuffers((u32) ticks_to_millisecs((gettime() - current_ticks)) < 16);
 
