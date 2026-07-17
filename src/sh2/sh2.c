@@ -975,18 +975,46 @@ void sh2_Write32(u32 addr, u32 val)
 	}
 }
 
-//#define MAX_PREV 1024
-//const u32 dol_breakpoint = 0x06000950;
-//u32 dol_prev_unreached = 0;
-//u32 dol_breakpoint_val = 0;
-//u32 dol_prev_pos = 0;
-//u32 dol_prev[MAX_PREV];
+#define MAX_PREV 1024
+static u32 dol_prev_pos = 0;
+static u32 dol_prev[MAX_PREV];
+static u32 dol_trap_done = 0;
+static u32 exec_prev[1024];
+static u32 exec_pos = 0;
+static u32 exec_trap = 0;
+static u32 exec_total = 0;
+void trace_exec(u32 pc)
+{
+	exec_prev[exec_pos] = pc;
+	exec_pos = (exec_pos+1) & 1023; ++exec_total;
+	if (pc < 0x200 && !exec_trap && exec_total > 5000) {
+		exec_trap = 1;
+		FILE *_f = fopen("sd:/exec.txt","w");
+		if (_f) {
+			fprintf(_f,"EXEC TRAP pc=%08X\nMSH2 pc=%08X pr=%08X r15=%08X\nSSH2 pc=%08X pr=%08X r15=%08X\nULTIMOS BLOQUES EJECUTADOS:\n",(unsigned)pc,(unsigned)msh2.pc,(unsigned)msh2.pr,(unsigned)msh2.r[15],(unsigned)ssh2.pc,(unsigned)ssh2.pr,(unsigned)ssh2.r[15]);
+			for (u32 _i = 1024-64; _i < 1024; ++_i) fprintf(_f,"%08X\n",(unsigned)exec_prev[(exec_pos + _i) & 1023]);
+			fclose(_f);
+		}
+	}
+}
 
 u16* sh2_GetPCAddr(u32 pc)
 {
 	//Debug
-	//dol_prev[dol_prev_pos] = pc;
-	//dol_prev_pos = (dol_prev_pos+1) & (MAX_PREV-1);
+	dol_prev[dol_prev_pos] = pc;
+	dol_prev_pos = (dol_prev_pos+1) & (MAX_PREV-1);
+	if (pc < 0x200 && !dol_trap_done && dol_prev_pos > 64) {
+		dol_trap_done = 1;
+		FILE *_f = fopen("sd:/trap2.txt","w");
+		if (_f) {
+			fprintf(_f,"TRAP pc=%08X\nMSH2: pc=%08X pr=%08X r15=%08X sr=%08X delay=%u\n",(unsigned)pc,(unsigned)msh2.pc,(unsigned)msh2.pr,(unsigned)msh2.r[15],(unsigned)msh2.sr,(unsigned)msh2.delay_slot);
+			fprintf(_f,"SSH2: pc=%08X pr=%08X r15=%08X sr=%08X delay=%u\n",(unsigned)ssh2.pc,(unsigned)ssh2.pr,(unsigned)ssh2.r[15],(unsigned)ssh2.sr,(unsigned)ssh2.delay_slot);
+			for (u32 _i = 0; _i < 16; ++_i) fprintf(_f,"M r%u=%08X S r%u=%08X\n",(unsigned)_i,(unsigned)msh2.r[_i],(unsigned)_i,(unsigned)ssh2.r[_i]);
+			fprintf(_f,"ULTIMOS BLOQUES NUEVOS:\n");
+			for (u32 _i = MAX_PREV-48; _i < MAX_PREV; ++_i) fprintf(_f,"%08X\n",(unsigned)dol_prev[(dol_prev_pos + _i) & (MAX_PREV-1)]);
+			fclose(_f);
+		}
+	}
 	////if (pc_prev_unreached == 0x0601C6DA && key == pc_breakpoint) {
 	//if (pc == dol_breakpoint) {
 	//	dol_breakpoint_val = pc;
