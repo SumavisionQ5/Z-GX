@@ -67,6 +67,7 @@ int dividenumclock = 1; //1 in original yabause
 //Dynarec sh2
 
 yabsys_struct yabsys;
+u32 snd_muted = 0; //toggle de sonido en vivo
 char bupfilename[512];
 u64 tickfreq;
 
@@ -251,6 +252,7 @@ void YabauseSetDecilineMode(int on) {
 //////////////////////////////////////////////////////////////////////////////
 
 void YabauseResetNoLoad(void) {
+   { extern u32 snd_muted; snd_muted = 0; } //auto-reset mute al arrancar juego
 #ifdef USE_SH2_OLD
 	SH2Reset(MSH2);
 #else
@@ -278,6 +280,7 @@ void YabauseResetNoLoad(void) {
 //////////////////////////////////////////////////////////////////////////////
 
 void YabauseReset(void) {
+   { extern u32 snd_muted; snd_muted = 0; } //auto-reset mute al arrancar juego
 	YabauseResetNoLoad();
 	if (yabsys.usequickload) {
 		if (YabauseQuickLoadGame() != 0) {
@@ -411,14 +414,14 @@ int YabauseEmulate(void) {
 #ifndef SCSP_PLUGIN
 #ifdef USE_SCSP2
          PROFILE_START("SCSP");
-         ScspExec(1);
+         if (snd_muted == 0) ScspExec(1);
          PROFILE_STOP("SCSP");
 #endif
 #else
          if(SCSCore->id == SCSCORE_SCSP2)
          {
             PROFILE_START("SCSP");
-            SCSCore->Exec(1);
+            { extern u32 snd_muted; if (snd_muted == 0) SCSCore->Exec(1); }
             PROFILE_STOP("SCSP");
          }
 #endif
@@ -473,7 +476,7 @@ int YabauseEmulate(void) {
 #ifndef SCSP_PLUGIN
 #ifndef USE_SCSP2
          PROFILE_START("SCSP");
-         ScspExec();
+         if (snd_muted == 0) ScspExec();
 		 osd_ProfAddTime(PROF_SCSP, 1);
          PROFILE_STOP("SCSP");
 #endif
@@ -481,7 +484,7 @@ int YabauseEmulate(void) {
          if(SCSCore->id == SCSCORE_SCSP1)
          {
             PROFILE_START("SCSP");
-            SCSCore->Exec(0);  // 0 is dummy value
+            { extern u32 snd_muted; if (snd_muted == 0) SCSCore->Exec(0); }  // 0 is dummy value
             PROFILE_STOP("SCSP");
 			osd_ProfAddTime(PROF_SCSP, 2);
          }
@@ -510,11 +513,13 @@ int YabauseEmulate(void) {
       yabsys.UsecFrac += usecinc;
       cycles_start = gettime();
       SmpcExec(yabsys.UsecFrac >> YABSYS_TIMING_BITS);
+      { extern void chd_CheckCanary(const char*); chd_CheckCanary("SmpcExec"); }
       osd_ProfAddTime(PROF_SMPC, gettime() - cycles_start);
 
 	//CD BLOCK
 	cycles_start = gettime();
 	Cs2Exec(yabsys.UsecFrac >> YABSYS_TIMING_BITS);
+	{ extern void chd_CheckCanary(const char*); chd_CheckCanary("Cs2Exec"); }
 	osd_ProfAddTime(PROF_CDB, gettime() - cycles_start);
       yabsys.UsecFrac &= YABSYS_TIMING_MASK;
 
@@ -530,7 +535,7 @@ int YabauseEmulate(void) {
             cycles++;
             saved_centicycles -= 100;
          }
-         M68KExec(cycles);
+         if (snd_muted == 0) M68KExec(cycles);
          PROFILE_STOP("68K");
 		 osd_ProfAddTime(PROF_M68K, 3);
       }
@@ -547,7 +552,7 @@ int YabauseEmulate(void) {
             cycles++;
             saved_centicycles -= 100;
          }
-         M68KExec(cycles);
+         if (snd_muted == 0) M68KExec(cycles);
          PROFILE_STOP("68K");
 		 osd_ProfAddTime(PROF_M68K, 4);
       }

@@ -798,6 +798,7 @@ static int LoadBinCueMultiFile(const char *cuefilename, FILE *iso_file)
    {
       YabSetError(YAB_ERR_MEMORYALLOC, NULL);
       free(disc.session);
+      disc.session = NULL; disc.session_num = 0; //FIX double-free
       disc.session = NULL;
       return -1;
    }
@@ -829,6 +830,7 @@ static int LoadISO(FILE *iso_file)
    {
       YabSetError(YAB_ERR_MEMORYALLOC, NULL);
       free(disc.session);
+      disc.session = NULL; disc.session_num = 0; //FIX double-free
       disc.session = NULL;
       return -1;
    }
@@ -987,9 +989,11 @@ static void ISOCDDeInit(void) {
                }
             }
             free(disc.session[i].track);
+            disc.session[i].track = NULL; //FIX double-free
          }
       }
       free(disc.session);
+      disc.session = NULL; disc.session_num = 0; //FIX double-free
    }
 }
 
@@ -1136,6 +1140,7 @@ typedef struct ChdInfo_ {
 
 ChdInfo * pChdInfo = NULL;
 
+
 int checkCHD(const char *filename ) {
 
   chd_file *chd;
@@ -1206,6 +1211,8 @@ static int LoadCHD(const char *chd_filename, FILE *iso_file)
       return -1;
     }
 
+    trk[num_tracks].ctl_addr = 0x01; trk[num_tracks].sector_size = 2352; //FIX: default seguro para types no reconocidos
+    {FILE*_f=fopen("sd:/chd.txt","a");if(_f){fprintf(_f,"TRK %d: n=%d type=%s fr=%d pg=%d\n",num_tracks,trak_number,track_type,frame,pregap);fclose(_f);}}
     trk[num_tracks].pregap = pregap;
     trk[num_tracks].postgap = postgap;
 
@@ -1350,6 +1357,7 @@ static int LoadCHD(const char *chd_filename, FILE *iso_file)
   }
 
   memcpy(disc.session[0].track, trk, num_tracks * sizeof(track_info_struct));
+  {FILE*_f=fopen("sd:/chd.txt","a");if(_f){fprintf(_f,"POST-COPY t0: ss=%u ctl=%02X lfo=%u\n",(unsigned)disc.session[0].track[0].sector_size,(unsigned)disc.session[0].track[0].ctl_addr,(unsigned)disc.session[0].track[0].logframeofs);fclose(_f);}}
 
   pChdInfo->hunk_buffer = malloc(pChdInfo->header->hunkbytes);
   chd_read(pChdInfo->chd, 0, pChdInfo->hunk_buffer);
@@ -1359,8 +1367,20 @@ static int LoadCHD(const char *chd_filename, FILE *iso_file)
 }
 
 
+//Trampa pisador de heap: chequea el track[] del CHD y loguea al primer culpable
+void chd_CheckCanary(const char* who)
+{
+	static int _dead = 0;
+	if (_dead) return;
+	if (disc.session && disc.session[0].track && disc.session[0].track[0].sector_size > 2448) {
+		_dead = 1;
+		FILE*_f=fopen("sd:/chd.txt","a");
+		if(_f){ extern void* Cs2Area; extern unsigned int cs2_sizeof(void); fprintf(_f,"PISADOR tras %s ss0=%u cs2=%p cs2end=%p trk=%p\n", who, (unsigned)disc.session[0].track[0].sector_size, (void*)Cs2Area, (void*)((char*)Cs2Area+cs2_sizeof()), (void*)disc.session[0].track); fclose(_f); }
+	}
+}
 static int ISOCDReadSectorFADFromCHD(u32 FAD, void *buffer) {
   int i, j;
+  { static u32 _rc=0; static u32 _bad=0; _rc++; if(_bad==0 && disc.session && disc.session[0].track && disc.session[0].track[0].sector_size > 2448){_bad=1;FILE*_f=fopen("sd:/chd.txt","a");if(_f){fprintf(_f,"PISADO en lectura numero %u\n",_rc);fclose(_f);}} }
   //size_t num_read = 0;
   track_info_struct *track = NULL;
   u32 chdlba;
@@ -1404,6 +1424,7 @@ static int ISOCDReadSectorFADFromCHD(u32 FAD, void *buffer) {
     pChdInfo->current_hunk_id = hunkid;
   }
 
+  if (track->sector_size > 2448 || (u32)hunk_offset + track->sector_size > pChdInfo->header->hunkbytes) { FILE*_f=fopen("sd:/chd.txt","a"); if(_f){fprintf(_f,"BAD FAD=%u ss=%u ho=%d t=%p base=%p ss0=%u ntrk=%d\n",(unsigned)FAD,(unsigned)track->sector_size,hunk_offset,(void*)track,(void*)disc.session[0].track,(unsigned)disc.session[0].track[0].sector_size,disc.session[0].track_num);fclose(_f);} return 0; }
   if (track->ctl_addr == 0x01) {
     for (int i = 0; i < track->sector_size; i += 2) {
       ((char*)buffer)[i] = pChdInfo->hunk_buffer[hunk_offset + i + 1];

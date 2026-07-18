@@ -320,6 +320,7 @@ static void FPSDisplay(void)
 	static int fpsframecount = 0;
 	static u64 fpsticks;
 	osd_FPSDraw(fps);
+	{ extern u32 snd_muted; if (snd_muted) osd_MsgAdd(10, 30, 0xFF4040FF, "SND OFF"); }
 	fpsframecount++;
 
 	if(YabauseGetTicks() >= fpsticks + yabsys.tickfreq) {

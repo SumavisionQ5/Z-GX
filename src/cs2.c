@@ -98,6 +98,7 @@ enum CDB_DATATRANSTYPE
 #define SEEK_TIME (60000*5)
 
 Cs2 * Cs2Area = NULL;
+unsigned int cs2_sizeof(void) { return sizeof(Cs2); }
 ip_struct *cdip = NULL;
 
 extern CDInterface *CDCoreList[];
@@ -422,7 +423,7 @@ u32 FASTCALL Cs2ReadLong(u32 addr) {
                            Cs2SortBlocks(Cs2Area->datatranspartition);
 
                            Cs2Area->datatranspartition->size -= Cs2Area->cdwnum;
-                           Cs2Area->datatranspartition->numblocks -= Cs2Area->datasectstotrans;
+                           { if (Cs2Area->datatranspartition->numblocks >= Cs2Area->datasectstotrans) Cs2Area->datatranspartition->numblocks -= Cs2Area->datasectstotrans; else Cs2Area->datatranspartition->numblocks = 0; } //FIX underflow u8
 
                            CDLOG("cs2\t: datatranspartition->size = %x\n", Cs2Area->datatranspartition->size);
                         }
@@ -545,7 +546,7 @@ void FASTCALL Cs2RapidCopyT1(void *dest, u32 count)
          Cs2SortBlocks(Cs2Area->datatranspartition);
 
          Cs2Area->datatranspartition->size -= Cs2Area->cdwnum;
-         Cs2Area->datatranspartition->numblocks -= Cs2Area->datasectstotrans;
+         { if (Cs2Area->datatranspartition->numblocks >= Cs2Area->datasectstotrans) Cs2Area->datatranspartition->numblocks -= Cs2Area->datasectstotrans; else Cs2Area->datatranspartition->numblocks = 0; } //FIX underflow u8
 
          CDLOG("cs2\t: datatranspartition->size = %x\n", Cs2Area->datatranspartition->size);
       }
@@ -628,7 +629,7 @@ void FASTCALL Cs2RapidCopyT2(void *dest, u32 count)
          Cs2SortBlocks(Cs2Area->datatranspartition);
 
          Cs2Area->datatranspartition->size -= Cs2Area->cdwnum;
-         Cs2Area->datatranspartition->numblocks -= Cs2Area->datasectstotrans;
+         { if (Cs2Area->datatranspartition->numblocks >= Cs2Area->datasectstotrans) Cs2Area->datatranspartition->numblocks -= Cs2Area->datasectstotrans; else Cs2Area->datatranspartition->numblocks = 0; } //FIX underflow u8
 
          CDLOG("cs2\t: datatranspartition->size = %x\n", Cs2Area->datatranspartition->size);
       }
@@ -1144,6 +1145,7 @@ void Cs2SetCommandTiming(u8 cmd) {
 
 void Cs2Execute(void) {
   u16 instruction = Cs2Area->reg.CR1 >> 8;
+  { extern void chd_CheckCanary(const char*); chd_CheckCanary("PRE-comando"); }
 
   //Cs2Area->reg.HIRQ &= ~CDB_HIRQ_CMOK;
 
@@ -1437,6 +1439,7 @@ void Cs2Execute(void) {
       CDLOG("cs2\t: Command %02x not implemented\n", instruction);
       break;
   }
+  { extern void chd_CheckCanary(const char*); static char _cb[64]; sprintf(_cb,"comando %02X",(unsigned)instruction); chd_CheckCanary(_cb); }
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1521,6 +1524,8 @@ void Cs2InitializeCDSystem(void) {
   u16 val = 0;
   u8 initflag = Cs2Area->reg.CR1 & 0xFF;
 
+  Cs2Area->datatranstype = CDB_DATATRANSTYPE_INVALID; Cs2Area->datatranspartition = NULL; Cs2Area->cdwnum = 0; Cs2Area->datasectstotrans = 0; Cs2Area->datanumsecttrans = 0; //FIX abort transfer en init (hw real)
+  { extern void chd_CheckCanary(const char*); chd_CheckCanary("04-inicio"); }
   Cs2Area->nextStatus = 0xFF;
 
   if ((Cs2Area->status & 0xF) != CDB_STAT_OPEN && (Cs2Area->status & 0xF) != CDB_STAT_NODISC)
@@ -1558,6 +1563,7 @@ void Cs2InitializeCDSystem(void) {
       Cs2Area->filter[i].condtrue = i;
       Cs2Area->filter[i].condfalse = 0xFF;
     }
+    { extern void chd_CheckCanary(const char*); chd_CheckCanary("04-tras-filtros"); }
 
     // clear partitions
     for (i = 0; i < MAX_SELECTORS; i++)
@@ -1580,6 +1586,7 @@ void Cs2InitializeCDSystem(void) {
     }
 
     Cs2Area->blockfreespace = MAX_BLOCKS;
+    { extern void chd_CheckCanary(const char*); chd_CheckCanary("04-tras-bloques"); }
 
     // initialize TOC
    // memset(Cs2Area->TOC, 0xFF, sizeof(Cs2Area->TOC));
@@ -1592,6 +1599,7 @@ void Cs2InitializeCDSystem(void) {
     Cs2Area->numfiles = 0;
 
     Cs2Area->lastbuffer = 0xFF;
+  { extern void chd_CheckCanary(const char*); chd_CheckCanary("04-medio"); }
 
   }
 
@@ -1623,6 +1631,7 @@ void Cs2InitializeCDSystem(void) {
   else
      val &= ~CDB_HIRQ_DCHG;
 
+  { extern void chd_CheckCanary(const char*); chd_CheckCanary("04-precierre"); }
   doCDReport(Cs2Area->status);
   Cs2SetIRQ(val | CDB_HIRQ_CMOK | CDB_HIRQ_ESEL);
 }
@@ -1687,7 +1696,7 @@ void Cs2EndDataTransfer(void) {
         Cs2SortBlocks(Cs2Area->datatranspartition);
 
         Cs2Area->datatranspartition->size -= Cs2Area->cdwnum;
-        Cs2Area->datatranspartition->numblocks -= Cs2Area->datasectstotrans;
+        { if (Cs2Area->datatranspartition->numblocks >= Cs2Area->datasectstotrans) Cs2Area->datatranspartition->numblocks -= Cs2Area->datasectstotrans; else Cs2Area->datatranspartition->numblocks = 0; } //FIX underflow u8
 
         if (Cs2Area->blockfreespace == MAX_BLOCKS) Cs2Area->isonesectorstored = 0;
 
@@ -2642,7 +2651,7 @@ void Cs2PutSectorData(void) {
          int startpos = putpartition->numblocks;
          for (i = 0; i < psdsectnum; i++)
          {
-            putpartition->block[putpartition->numblocks] = Cs2AllocateBlock(&putpartition->blocknum[putpartition->numblocks], Cs2Area->putsectsize);
+            if (putpartition->numblocks < MAX_BLOCKS) putpartition->block[putpartition->numblocks] = Cs2AllocateBlock(&putpartition->blocknum[putpartition->numblocks], Cs2Area->putsectsize); else return; //FIX bounds
             putpartition->block[putpartition->numblocks]->FAD = i;
             putpartition->numblocks++;
             putpartition->size += Cs2Area->putsectsize;
@@ -2693,7 +2702,7 @@ void Cs2CopySectorData(void) {
   }
 
   for (int i = 0; i < count; i++) {
-    putpartition->block[putpartition->numblocks] = Cs2AllocateBlock(&putpartition->blocknum[putpartition->numblocks],2352);
+    if (putpartition->numblocks < MAX_BLOCKS) putpartition->block[putpartition->numblocks] = Cs2AllocateBlock(&putpartition->blocknum[putpartition->numblocks],2352); else return; //FIX bounds
     u8 *dest_ptr =  putpartition->block[putpartition->numblocks]->data;
     u8 *src_ptr = srcpartition->block[offset+i]->data;
     memcpy(dest_ptr, src_ptr, sizeof(u8) * 2352);
@@ -3481,6 +3490,7 @@ partition_struct * Cs2FilterData(filter_struct * curfilter, int isaudio)
      if (condresults == 1)
      {
         Cs2Area->lastbuffer = curfilter->condtrue;
+        if (curfilter->condtrue >= MAX_SELECTORS) { FILE*_f=fopen("sd:/chd.txt","a"); if(_f){fprintf(_f,"FILTRO MALO condtrue=%u\n",(unsigned)curfilter->condtrue);fclose(_f);} return NULL; } //FIX filtro
         fltpartition = &Cs2Area->partition[curfilter->condtrue];
         break;
      }
@@ -3490,12 +3500,14 @@ partition_struct * Cs2FilterData(filter_struct * curfilter, int isaudio)
 
         if (curfilter->condfalse == 0xFF)
            return NULL;
+        if (curfilter->condfalse >= MAX_SELECTORS) { FILE*_f=fopen("sd:/chd.txt","a"); if(_f){fprintf(_f,"FILTRO MALO condfalse=%u\n",(unsigned)curfilter->condfalse);fclose(_f);} return NULL; } //FIX filtro
         // loop and try filter that was connected to the false connector
         curfilter = &Cs2Area->filter[curfilter->condfalse];
      }
   }
 
   // Allocate block
+  if (fltpartition->numblocks >= MAX_BLOCKS) return NULL; //FIX bounds
   fltpartition->block[fltpartition->numblocks] = Cs2AllocateBlock(&fltpartition->blocknum[fltpartition->numblocks], Cs2Area->getsectsize);
 
   if (fltpartition->block[fltpartition->numblocks] == NULL)
