@@ -67,6 +67,8 @@ static struct CellFormatData {
 	u32 spec_pri; 		/*Special priority mode*/
 
 	u32 xscroll;		/*X increment*/
+	f32 xzoom;		/*X zoom factor (1.0 = sin zoom)*/
+	f32 yzoom;
 	u32 yscroll; 		/*Y increment*/
 	u32 page_mask;		/*page mask*/
 	u32 page_shft;		/*page shift*/
@@ -260,6 +262,7 @@ static void __Vdp2ReadNBG(u32 bg_id)
 			cell.spec_pri = (Vdp2Regs->SFPRMD >> 0) & 0x3;
 			cell.xscroll = (((u32)Vdp2Regs->SCXIN0) << 8) | (((u32)Vdp2Regs->SCXDN0) >> 8);
 			cell.yscroll = (((u32)Vdp2Regs->SCYIN0) << 8) | (((u32)Vdp2Regs->SCYDN0) >> 8);
+			{ u32 zx = ((Vdp2Regs->ZMXN0.part.I & 0x7) << 8) | (Vdp2Regs->ZMXN0.part.D >> 8); u32 zy = ((Vdp2Regs->ZMYN0.part.I & 0x7) << 8) | (Vdp2Regs->ZMYN0.part.D >> 8); cell.xzoom = zx ? ((f32)zx / 256.0f) : 1.0f; cell.yzoom = zy ? ((f32)zy / 256.0f) : 1.0f; }
 			cell.cram_offset = (Vdp2Regs->CRAOFA << 4) & 0x70;
 			u32 map_shft = 11 + (((cell.char_ctl << 1) & 2) ^ 2) + (((cell.ptrn_supp >> 15) & 1) ^ 1);
 			u32 map_offset = ((((u32)Vdp2Regs->MPOFN) >> 0) & 0x7) << 6;
@@ -278,6 +281,7 @@ static void __Vdp2ReadNBG(u32 bg_id)
 			cell.spec_pri = (Vdp2Regs->SFPRMD >> 2) & 0x3;
 			cell.xscroll = (((u32)Vdp2Regs->SCXIN1) << 8) | (((u32)Vdp2Regs->SCXDN1) >> 8);
 			cell.yscroll = (((u32)Vdp2Regs->SCYIN1) << 8) | (((u32)Vdp2Regs->SCYDN1) >> 8);
+			{ u32 zx = ((Vdp2Regs->ZMXN1.part.I & 0x7) << 8) | (Vdp2Regs->ZMXN1.part.D >> 8); u32 zy = ((Vdp2Regs->ZMYN1.part.I & 0x7) << 8) | (Vdp2Regs->ZMYN1.part.D >> 8); cell.xzoom = zx ? ((f32)zx / 256.0f) : 1.0f; cell.yzoom = zy ? ((f32)zy / 256.0f) : 1.0f; }
 			cell.cram_offset = (Vdp2Regs->CRAOFA) & 0x70;
 			u32 map_shft = 11 + (((cell.char_ctl << 1) & 2) ^ 2) + (((cell.ptrn_supp >> 15) & 1) ^ 1);
 			u32 map_offset = ((((u32)Vdp2Regs->MPOFN) >> 4) & 0x7) << 6;
@@ -295,6 +299,7 @@ static void __Vdp2ReadNBG(u32 bg_id)
 			cell.spec_pri = (Vdp2Regs->SFPRMD >> 4) & 0x3;
 			cell.xscroll = (((u32)Vdp2Regs->SCXN2) << 8);
 			cell.yscroll = (((u32)Vdp2Regs->SCYN2) << 8);
+			cell.xzoom = 1.0f; cell.yzoom = 1.0f;
 			cell.cram_offset = (Vdp2Regs->CRAOFA >> 4) & 0x70;
 			u32 map_shft = 11 + (((cell.char_ctl << 1) & 2) ^ 2) + (((cell.ptrn_supp >> 15) & 1) ^ 1);
 			u32 map_offset = ((((u32)Vdp2Regs->MPOFN) >> 8) & 0x7) << 6;
@@ -312,6 +317,7 @@ static void __Vdp2ReadNBG(u32 bg_id)
 			cell.spec_pri = (Vdp2Regs->SFPRMD >> 6) & 0x3;
 			cell.xscroll = (((u32)Vdp2Regs->SCXN3) << 8);
 			cell.yscroll = (((u32)Vdp2Regs->SCYN3) << 8);
+			cell.xzoom = 1.0f; cell.yzoom = 1.0f;
 			cell.cram_offset = (Vdp2Regs->CRAOFA >> 8) & 0x70;
 			u32 map_shft = 11 + (((cell.char_ctl << 1) & 2) ^ 2) + (((cell.ptrn_supp >> 15) & 1) ^ 1);
 			u32 map_offset = ((((u32)Vdp2Regs->MPOFN) >> 12) & 0x7) << 6;
@@ -360,12 +366,12 @@ static void SGX_Vdp2DrawBitmap(void)
 static void SGX_Vdp2DrawCellSimple(void)
 {
 	guMtxIdentity(vdp2mtx);
-	guMtxScale(vdp2mtx, cell.char_size, cell.char_size, 0.0f);
+	guMtxScale(vdp2mtx, cell.char_size / cell.xzoom, cell.char_size / cell.yzoom, 0.0f);
 	u32 char_ofs_mask = (cell.char_size << 8) - 1;
 	//TODO: When scaling we must leave only integer values if we dont
 	//want to worry with artifacts
-	vdp2mtx[0][3] = -(((f32)((cell.xscroll & char_ofs_mask) >> 8)));
-	vdp2mtx[1][3] = -(((f32)((cell.yscroll & char_ofs_mask) >> 8)));
+	vdp2mtx[0][3] = -(((f32)((cell.xscroll & char_ofs_mask) >> 8)) / cell.xzoom);
+	vdp2mtx[1][3] = -(((f32)((cell.yscroll & char_ofs_mask) >> 8)) / cell.yzoom);
 	GX_LoadPosMtxImm(vdp2mtx, MTX_VDP2_POS_BG);
 	GX_SetCurrentMtx(MTX_VDP2_POS_BG);
 
@@ -373,8 +379,8 @@ static void SGX_Vdp2DrawCellSimple(void)
 
 	u32 x_tile = ((cell.xscroll >> 8) / cell.char_size);
 	u32 y_tile = ((cell.yscroll >> 8) / cell.char_size);
-	u32 x_max = (vdp2_disp_w / cell.char_size) + 1;
-	u32 y_max = (vdp2_disp_h / cell.char_size) + 1;
+	u32 x_max = (u32)((vdp2_disp_w * cell.xzoom) / cell.char_size) + 2;
+	u32 y_max = (u32)((vdp2_disp_h * cell.yzoom) / cell.char_size) + 2;
 
 	GX_SetTexCoordScaleManually(GX_TEXCOORD0, GX_TRUE, cell.char_size, cell.char_size);
 	//GX_SetPointSize(cell.char_size * 6, GX_TO_ONE);

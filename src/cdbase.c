@@ -1380,7 +1380,6 @@ void chd_CheckCanary(const char* who)
 }
 static int ISOCDReadSectorFADFromCHD(u32 FAD, void *buffer) {
   int i, j;
-  { static u32 _rc=0; static u32 _bad=0; _rc++; if(_bad==0 && disc.session && disc.session[0].track && disc.session[0].track[0].sector_size > 2448){_bad=1;FILE*_f=fopen("sd:/chd.txt","a");if(_f){fprintf(_f,"PISADO en lectura numero %u\n",_rc);fclose(_f);}} }
   //size_t num_read = 0;
   track_info_struct *track = NULL;
   u32 chdlba;

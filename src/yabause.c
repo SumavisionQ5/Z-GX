@@ -513,13 +513,11 @@ int YabauseEmulate(void) {
       yabsys.UsecFrac += usecinc;
       cycles_start = gettime();
       SmpcExec(yabsys.UsecFrac >> YABSYS_TIMING_BITS);
-      { extern void chd_CheckCanary(const char*); chd_CheckCanary("SmpcExec"); }
       osd_ProfAddTime(PROF_SMPC, gettime() - cycles_start);
 
 	//CD BLOCK
 	cycles_start = gettime();
 	Cs2Exec(yabsys.UsecFrac >> YABSYS_TIMING_BITS);
-	{ extern void chd_CheckCanary(const char*); chd_CheckCanary("Cs2Exec"); }
 	osd_ProfAddTime(PROF_CDB, gettime() - cycles_start);
       yabsys.UsecFrac &= YABSYS_TIMING_MASK;
 

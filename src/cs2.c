@@ -1145,7 +1145,6 @@ void Cs2SetCommandTiming(u8 cmd) {
 
 void Cs2Execute(void) {
   u16 instruction = Cs2Area->reg.CR1 >> 8;
-  { extern void chd_CheckCanary(const char*); chd_CheckCanary("PRE-comando"); }
 
   //Cs2Area->reg.HIRQ &= ~CDB_HIRQ_CMOK;
 
@@ -1439,7 +1438,6 @@ void Cs2Execute(void) {
       CDLOG("cs2\t: Command %02x not implemented\n", instruction);
       break;
   }
-  { extern void chd_CheckCanary(const char*); static char _cb[64]; sprintf(_cb,"comando %02X",(unsigned)instruction); chd_CheckCanary(_cb); }
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1525,7 +1523,6 @@ void Cs2InitializeCDSystem(void) {
   u8 initflag = Cs2Area->reg.CR1 & 0xFF;
 
   Cs2Area->datatranstype = CDB_DATATRANSTYPE_INVALID; Cs2Area->datatranspartition = NULL; Cs2Area->cdwnum = 0; Cs2Area->datasectstotrans = 0; Cs2Area->datanumsecttrans = 0; //FIX abort transfer en init (hw real)
-  { extern void chd_CheckCanary(const char*); chd_CheckCanary("04-inicio"); }
   Cs2Area->nextStatus = 0xFF;
 
   if ((Cs2Area->status & 0xF) != CDB_STAT_OPEN && (Cs2Area->status & 0xF) != CDB_STAT_NODISC)
@@ -1563,7 +1560,6 @@ void Cs2InitializeCDSystem(void) {
       Cs2Area->filter[i].condtrue = i;
       Cs2Area->filter[i].condfalse = 0xFF;
     }
-    { extern void chd_CheckCanary(const char*); chd_CheckCanary("04-tras-filtros"); }
 
     // clear partitions
     for (i = 0; i < MAX_SELECTORS; i++)
@@ -1586,7 +1582,6 @@ void Cs2InitializeCDSystem(void) {
     }
 
     Cs2Area->blockfreespace = MAX_BLOCKS;
-    { extern void chd_CheckCanary(const char*); chd_CheckCanary("04-tras-bloques"); }
 
     // initialize TOC
    // memset(Cs2Area->TOC, 0xFF, sizeof(Cs2Area->TOC));
@@ -1599,7 +1594,6 @@ void Cs2InitializeCDSystem(void) {
     Cs2Area->numfiles = 0;
 
     Cs2Area->lastbuffer = 0xFF;
-  { extern void chd_CheckCanary(const char*); chd_CheckCanary("04-medio"); }
 
   }
 
@@ -1631,7 +1625,6 @@ void Cs2InitializeCDSystem(void) {
   else
      val &= ~CDB_HIRQ_DCHG;
 
-  { extern void chd_CheckCanary(const char*); chd_CheckCanary("04-precierre"); }
   doCDReport(Cs2Area->status);
   Cs2SetIRQ(val | CDB_HIRQ_CMOK | CDB_HIRQ_ESEL);
 }
