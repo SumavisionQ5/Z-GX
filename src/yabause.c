@@ -68,6 +68,7 @@ int dividenumclock = 1; //1 in original yabause
 
 yabsys_struct yabsys;
 u32 snd_muted = 0; //toggle de sonido en vivo
+u32 drc_inval_count = 0; //invalidaciones de cache por frame (debug)
 char bupfilename[512];
 u64 tickfreq;
 

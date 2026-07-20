@@ -301,8 +301,10 @@ void drc_MarkCodePage(u32 addr)
 }
 void drc_CheckWrite(u32 addr)
 {
+	extern u32 drc_inval_count;
 	u32 p = __PageIdx(addr);
 	if (p != 0xFFFFFFFF && drc_code_pages[p]) {
+		drc_inval_count++;
 		HashClearRange(addr & ~0x3FFu, (addr & ~0x3FFu) + 0x400);
 		drc_code_pages[p] = 0;
 	}

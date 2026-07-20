@@ -320,6 +320,7 @@ static void FPSDisplay(void)
 	static int fpsframecount = 0;
 	static u64 fpsticks;
 	osd_FPSDraw(fps);
+	{ extern u32 drc_inval_count; static char _ib[32]; extern void osd_MsgAdd(u32,u32,u32,char*); }
 	{ extern u32 snd_muted; if (snd_muted) osd_MsgAdd(10, 30, 0xFF4040FF, "SND OFF"); }
 	fpsframecount++;
 
@@ -369,9 +370,7 @@ void Vdp2VBlankOUT(void)
 	if (yabsys.flags & SYS_FLAGS_SHOW_FPS) {
 		FPSDisplay();
 	}
-#if 0
-	osd_ProfDraw();
-#endif
+	if (yabsys.flags & SYS_FLAGS_SHOW_FPS) osd_ProfDraw();
 	SGX_Vdp1SwapFramebuffer();
 	SVI_SwapBuffers((u32) ticks_to_millisecs((gettime() - current_ticks)) < 16);
 
