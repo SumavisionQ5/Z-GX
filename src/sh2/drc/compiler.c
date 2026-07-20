@@ -1395,7 +1395,7 @@ u16* _jit_GenIFCBlock(u32 addr)
 	block_data.ld_regs = ld_regs;
 	block_data.instr_count = instr_count;
 	block_data.entry_addr = entry_addr;
-	{ extern void drc_MarkCodePage(u32); drc_MarkCodePage(entry_addr); drc_MarkCodePage(curr_pc); } //FIX cache stale: marcar paginas del bloque
+	{ extern void drc_MarkCodePage(u32); extern u32 drc_comp_count; drc_comp_count++; drc_MarkCodePage(entry_addr); drc_MarkCodePage(curr_pc); } //FIX cache stale + contador
 
 	return ret_ptr;
 }
@@ -1410,6 +1410,7 @@ u32* _jit_GenBlock(u32* iblock, u32 addr)
 	u16 *inst_ptr = _jit_GenIFCBlock(addr);
 
 	if (drc_code_pos + (block_data.instr_count * 8) >= DRC_CODE_SIZE) {
+		{ extern u32 drc_flush_count; drc_flush_count++; }
 		HashClearAll();
 	}
 

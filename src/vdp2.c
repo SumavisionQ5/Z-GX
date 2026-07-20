@@ -338,6 +338,7 @@ static u32 prev_tvmd = 0;
 
 void Vdp2VBlankOUT(void)
 {
+	{ extern void drc_FlushDirtyPages(void); drc_FlushDirtyPages(); } //flush invalidaciones diferidas
 	Vdp2Regs->TVSTAT = (Vdp2Regs->TVSTAT & ~0x0008) | 0x0002;
 	u32 cycles_start;
 

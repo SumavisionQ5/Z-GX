@@ -287,6 +287,7 @@ void sh2_NMI(SH2 *sh)
 
 //FIX cache stale: bitmap de paginas (1KB) de WRAM con codigo compilado
 u8 drc_code_pages[2048]; //2MB WRAM / 1KB por pagina = 2048 paginas
+u8 drc_page_heat[2048]; //temperatura: invalidaciones recientes por pagina
 static inline u32 __PageIdx(u32 addr)
 {
 	addr &= 0x0FFFFFFF;
@@ -299,18 +300,47 @@ void drc_MarkCodePage(u32 addr)
 	u32 p = __PageIdx(addr);
 	if (p != 0xFFFFFFFF) drc_code_pages[p] = 1;
 }
+//Invalidacion diferida: paginas sucias se procesan 1 vez por frame (VBlank)
+static u32 drc_dirty_pages[16];
+static u32 drc_dirty_count = 0;
+void drc_FlushDirtyPages(void)
+{
+	extern u32 drc_inval_count;
+	for (u32 i = 0; i < drc_dirty_count; i++) {
+		u32 p = drc_dirty_pages[i];
+		u32 base = (p >= 1024) ? (0x06000000 | ((p - 1024) << 10)) : (0x00200000 | (p << 10));
+		drc_inval_count++;
+		HashClearRange(base, base + 0x400);
+		drc_code_pages[p] = 0;
+	}
+	{ static u32 _fc=0; if (++_fc >= 64) { _fc = 0; for (u32 _j=0; _j<2048; _j++) drc_page_heat[_j] = 0; } }
+	drc_dirty_count = 0;
+}
 void drc_CheckWrite(u32 addr)
 {
 	extern u32 drc_inval_count;
 	u32 p = __PageIdx(addr);
 	if (p != 0xFFFFFFFF && drc_code_pages[p]) {
-		drc_inval_count++;
-		HashClearRange(addr & ~0x3FFu, (addr & ~0x3FFu) + 0x400);
-		drc_code_pages[p] = 0;
+		//Encolar pagina sucia (dedup); flush inmediato si la cola llena
+		//Temperatura: pagina fria (overlay/codigo nuevo) invalida YA; caliente (dato+codigo) difiere a VBlank
+		if (drc_page_heat[p] < 255) drc_page_heat[p]++;
+		if (drc_page_heat[p] <= 3) {
+			drc_inval_count++;
+			HashClearRange(addr & ~0x3FFu, (addr & ~0x3FFu) + 0x400);
+			drc_code_pages[p] = 0;
+		} else {
+			u32 _dup = 0;
+			for (u32 _i = 0; _i < drc_dirty_count; _i++) { if (drc_dirty_pages[_i] == p) { _dup = 1; break; } }
+			if (_dup == 0) {
+				if (drc_dirty_count >= 16) drc_FlushDirtyPages();
+				drc_dirty_pages[drc_dirty_count++] = p;
+			}
+		}
 	}
 }
 void sh2_WriteNotify(u32 start, u32 len)
 {
+	drc_FlushDirtyPages(); //cerrar ventana antes de invalidar rango
 	HashClearRange(start, start + len);
 }
 
