@@ -33,7 +33,7 @@
 
 static AESNDPB* voice = NULL;
 
-#define NUM_BUFFERS		4
+#define NUM_BUFFERS		8
 #define BUFFER_SIZE		(8*DSP_STREAMBUFFER_SIZE)
 
 char buffers[NUM_BUFFERS][BUFFER_SIZE];
@@ -46,13 +46,16 @@ u32 fillBuffer = 0;
 
 static void aesnd_callback(AESNDPB* voice, u32 state){
 	if(state == VOICE_STATE_STREAM) {
-		if(playBuffer != fillBuffer) {
-			if(fillBufferOffset[playBuffer] == BUFFER_SIZE) {
-				AESND_SetVoiceBuffer(voice,
-						buffers[playBuffer], BUFFER_SIZE);
-				playBuffer = (playBuffer + 1) % NUM_BUFFERS;
-				bytesBuffered -= BUFFER_SIZE;
-			}
+		if(playBuffer != fillBuffer && fillBufferOffset[playBuffer] == BUFFER_SIZE) {
+			AESND_SetVoiceBuffer(voice, buffers[playBuffer], BUFFER_SIZE);
+			playBuffer = (playBuffer + 1) % NUM_BUFFERS;
+			bytesBuffered -= BUFFER_SIZE;
+		} else {
+			//Underrun: re-entregar el buffer anterior evita el hueco (entrecortado)
+			{ extern u32 drc_flush_count; drc_flush_count++; } //reuso contador F: para underruns
+			{ extern u32 drc_flush_count; drc_flush_count++; } //reuso contador F: para underruns
+			int prev = (playBuffer + NUM_BUFFERS - 1) % NUM_BUFFERS;
+			AESND_SetVoiceBuffer(voice, buffers[prev], BUFFER_SIZE);
 		}
 	}
 }
