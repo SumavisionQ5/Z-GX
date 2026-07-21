@@ -316,6 +316,23 @@ void drc_FlushDirtyPages(void)
 	{ static u32 _fc=0; if (++_fc >= 64) { _fc = 0; for (u32 _j=0; _j<2048; _j++) drc_page_heat[_j] = 0; } }
 	drc_dirty_count = 0;
 }
+//Plan D refinado: invalidar SOLO la pagina del addr si esta en cola sucia
+void drc_FlushIfDirty(u32 addr)
+{
+	extern u32 drc_inval_count;
+	u32 p = __PageIdx(addr);
+	if (p == 0xFFFFFFFF) return;
+	for (u32 i = 0; i < drc_dirty_count; i++) {
+		if (drc_dirty_pages[i] == p) {
+			u32 base = (p >= 1024) ? (0x06000000 | ((p - 1024) << 10)) : (0x00200000 | (p << 10));
+			drc_inval_count++;
+			HashClearRange(base, base + 0x400);
+			drc_code_pages[p] = 0;
+			drc_dirty_pages[i] = drc_dirty_pages[--drc_dirty_count];
+			return;
+		}
+	}
+}
 void drc_CheckWrite(u32 addr)
 {
 	extern u32 drc_inval_count;
