@@ -491,7 +491,10 @@ u8 sh2_OnchipRead8(u32 addr)
 		case 0x004: return OCR_SSR;
 		case 0x005: return OCR_RDR;
 		case 0x010: return OCR_TIER;
-		case 0x011: return OCR_FTCSR;
+		case 0x011:
+			//IDLE SKIP: slave polleando ICF apagado -> quemar slice (sync SGL master-slave)
+			if ((sh->flags & SH2_FLAG_SLAVE) && !(OCR_FTCSR & 0x80) && sh->cycles < 0) { sh->cycles += 256; if (sh->cycles > 0) sh->cycles = 0; }
+			return OCR_FTCSR;
 		case 0x012: return OCR_FRC >> 8;
 		case 0x013: return OCR_FRC & 0xFF;
 		case 0x014:
