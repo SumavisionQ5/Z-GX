@@ -414,6 +414,7 @@ static void SGX_Vdp2DrawCellSimple(void)
 	}
 
 
+	u32 _last_tex = 0, _last_tlut = 0, _last_z = 0xFFFFFFFF;
 	for (u32 j = 0; j < y_max; ++j) {
 		u32 y = j + y_tile;
 		u32 yaddr = ((y & cell.page_mask) | ((y & (cell.page_mask+1)) << 1)) << cell.page_shft;
@@ -441,10 +442,14 @@ static void SGX_Vdp2DrawCellSimple(void)
 			u32 vert = (((i & 0xFF) << 24) | ((j & 0xFF) << 16));
 
 			//Set texture addr, tlut and Z offset from priority value
-			GX_LOAD_BP_REG(tex_maddr);
-			GX_LOAD_BP_REG(tlut_addr);
-			GX_LOAD_XF_REGS(0x101C, 1); //Set the Viewport Z
-			wgPipe->F32 = (f32) (16777216 - (cell.pri | ((prcc >> 25) & 0x10)));
+			u32 _zval = cell.pri | ((prcc >> 25) & 0x10);
+			if (tex_maddr != _last_tex) { GX_LOAD_BP_REG(tex_maddr); _last_tex = tex_maddr; }
+			if (tlut_addr != _last_tlut) { GX_LOAD_BP_REG(tlut_addr); _last_tlut = tlut_addr; }
+			if (_zval != _last_z) {
+				GX_LOAD_XF_REGS(0x101C, 1); //Set the Viewport Z
+				wgPipe->F32 = (f32) (16777216 - _zval);
+				_last_z = _zval;
+			}
 			//GX_LOAD_XF_REGS(0x1025, 1); //Set the Projection registers
 			//wgPipe->F32 = - (0.00000006f * (cell.pri | ((prcc >> 25) & 0x10)));
 

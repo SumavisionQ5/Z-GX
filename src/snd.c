@@ -53,7 +53,6 @@ static void aesnd_callback(AESNDPB* voice, u32 state){
 		} else {
 			//Underrun: re-entregar el buffer anterior evita el hueco (entrecortado)
 			{ extern u32 drc_flush_count; drc_flush_count++; } //reuso contador F: para underruns
-			{ extern u32 drc_flush_count; drc_flush_count++; } //reuso contador F: para underruns
 			int prev = (playBuffer + NUM_BUFFERS - 1) % NUM_BUFFERS;
 			AESND_SetVoiceBuffer(voice, buffers[prev], BUFFER_SIZE);
 		}
