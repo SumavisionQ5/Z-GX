@@ -210,6 +210,7 @@ u16 FASTCALL Cs2ReadWord(u32 addr) {
                            return 0;
                         const u8 *ptr = &Cs2Area->datatranspartition->block[Cs2Area->datatranssectpos + Cs2Area->datanumsecttrans]->data[Cs2Area->datatransoffset];
 
+
                         val = *((const u16 *) ptr);
                         Cs2Area->cdwnum += 2;
                         Cs2Area->datatransoffset += 2;
@@ -412,6 +413,7 @@ u32 FASTCALL Cs2ReadLong(u32 addr) {
                            CDLOG("cs2\t: datatranspartition->block[Cs2Area->datanumsecttrans] was NULL");
                            return 0;
                         }
+
                         val = *((const u32 *) ptr);
 
                         //LOG("[CS2] get addr = %d,val = %08X", Cs2Area->datatransoffset, val);
@@ -534,14 +536,15 @@ void FASTCALL Cs2RapidCopyT1(void *dest, u32 count)
 
       while (count > 0 && Cs2Area->datanumsecttrans < Cs2Area->datasectstotrans)
       {
-         const u8 *src = &Cs2Area->datatranspartition->block[Cs2Area->datanumsecttrans]->data[Cs2Area->datatransoffset];
-         const u32 size = Cs2Area->datatranspartition->block[Cs2Area->datanumsecttrans]->size;
+         const u8 *src = &Cs2Area->datatranspartition->block[Cs2Area->datatranssectpos + Cs2Area->datanumsecttrans]->data[Cs2Area->datatransoffset];
+         const u32 size = Cs2Area->datatranspartition->block[Cs2Area->datatranssectpos + Cs2Area->datanumsecttrans]->size;
          const u32 max = size - Cs2Area->datatransoffset;
          const u32 copy = (max < count*4) ? max : count*4;
          memcpy(dest8, src, copy);
          dest8 += copy;
          count -= copy/4;
          Cs2Area->datatransoffset += copy;
+
          Cs2Area->cdwnum += copy;
 
          // Update the sector index if we reached the end of the sector
@@ -601,8 +604,8 @@ void FASTCALL Cs2RapidCopyT2(void *dest, u32 count)
 
       while (count > 0 && Cs2Area->datanumsecttrans < Cs2Area->datasectstotrans)
       {
-         const u8 *src = &Cs2Area->datatranspartition->block[Cs2Area->datanumsecttrans]->data[Cs2Area->datatransoffset];
-         const u32 size = Cs2Area->datatranspartition->block[Cs2Area->datanumsecttrans]->size;
+         const u8 *src = &Cs2Area->datatranspartition->block[Cs2Area->datatranssectpos + Cs2Area->datanumsecttrans]->data[Cs2Area->datatransoffset];
+         const u32 size = Cs2Area->datatranspartition->block[Cs2Area->datatranssectpos + Cs2Area->datanumsecttrans]->size;
          const u32 max = size - Cs2Area->datatransoffset;
          const u32 copy = (max < count*4) ? max : count*4;
          u32 i = 0;
@@ -628,6 +631,7 @@ void FASTCALL Cs2RapidCopyT2(void *dest, u32 count)
          }
          count -= copy/4;
          Cs2Area->datatransoffset += copy;
+
          Cs2Area->cdwnum += copy;
 
          if (Cs2Area->datatransoffset >= size)
@@ -1170,6 +1174,7 @@ void Cs2SetCommandTiming(u8 cmd) {
 
 void Cs2Execute(void) {
   u16 instruction = Cs2Area->reg.CR1 >> 8;
+
 
   //Cs2Area->reg.HIRQ &= ~CDB_HIRQ_CMOK;
 
