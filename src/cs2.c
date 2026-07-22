@@ -1093,7 +1093,7 @@ void Cs2Exec(u32 timing) {
             break;
          case CDB_STAT_BUSY:
            CDLOG("Change state from %d to %d\n", Cs2Area->status, Cs2Area->nextStatus);
-           if (Cs2Area->nextStatus != -1) {
+           if (Cs2Area->nextStatus != 0xFF) {
              Cs2Area->status = Cs2Area->nextStatus;
              Cs2Area->nextStatus = 0xFF;
            }
