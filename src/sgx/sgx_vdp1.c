@@ -141,6 +141,13 @@ void SGX_Vdp1Begin(void)
 	//VIDSoftVdp1EraseFrameBuffer();
 	//GX_LoadPosMtxIdx(0, GX_PNMTX0);
 	GX_SetPixelFmt(GX_PF_RGBA6_Z24, GX_ZC_LINEAR);
+	//FIX vcop v2: limpiar EFB del area vdp1 via copy-clear (sin dibujar geometria)
+	//La escena del frame anterior contaminaba la captura del framebuffer
+	GX_SetCopyClear((GXColor){0x00, 0x00, 0x00, 0x00}, 0);
+	GX_SetTexCopySrc(0, 0, vdp1_fb_w, vdp1_fb_h);
+	GX_SetTexCopyDst(vdp1_fb_w, vdp1_fb_h, GX_TF_RGB565, GX_FALSE);
+	GX_CopyTex(dot_tex[front_fb ^ 1], GX_TRUE);
+	GX_PixModeSync();
 	//TODO: Load vdp1 matrix... should we clear the values? YES
 
 	GX_ClearVtxDesc();
@@ -492,8 +499,12 @@ static void __Vdp1Convert16bpp(void)
 
 //Ends the VDP1 Drawing, copies the FB to memory
 //and then proceses it depending on the sprite type
+u32 _vc_cmds[16];
+u32 _vc_modes[8];
+u32 _vc_pmod_ecd[2];
 void SGX_Vdp1End(void)
 {
+	{ static u32 _fr=0; if(++_fr==600){ FILE*_f=fopen("sd:/vcop.txt","w"); if(_f){ u32 _k; for(_k=0;_k<16;_k++) fprintf(_f,"cmd%u=%u\n",_k,_vc_cmds[_k]); for(_k=0;_k<8;_k++) fprintf(_f,"mode%u=%u\n",_k,_vc_modes[_k]); fprintf(_f,"ecd_off=%u ecd_on=%u\n",_vc_pmod_ecd[0],_vc_pmod_ecd[1]); fprintf(_f,"SPCTL=%04X\n",Vdp2Regs->SPCTL); fclose(_f);} } }
 	SGX_SpriteConverterSet(0, SPRITE_NONE, 0);
 	SGX_SetVtxOffset(0, 0);
 	GX_SetScissor(0, 0, 640, 480);
@@ -584,6 +595,7 @@ static void __SGX_Vdp1SetConstantPart(u32 is_rgb)
 
 static u32 __SGX_Vdp1SetMode(u32 w, u32 h)
 {
+	{ u32 _m=(vdp1cmd->PMOD>>3)&0x7; _vc_modes[_m]++; _vc_pmod_ecd[(vdp1cmd->PMOD>>7)&1]++; }
 	//Address to valid vdp1 RAM range
 	u8 *chr_addr = Vdp1Ram + ((vdp1cmd->SRCA & 0xFFFC) << 3);
 	u32 spr_w = w << 3;

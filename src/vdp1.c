@@ -339,6 +339,7 @@ void Vdp1Draw(void) {
 	vdp1cmd = (Vdp1Cmd*) (Vdp1Ram + Vdp1Regs->addr);
    while (!(command & 0x8000) && commandCounter < 2048) { // fix me
       // First, process the command
+      { extern u32 _vc_cmds[16]; _vc_cmds[command & 0x000F]++; }
       if (!(command & 0x4000)) { // if (!skip)
 			switch (command & 0x000F) {
 				case 0: SGX_Vdp1DrawNormalSpr();    break;

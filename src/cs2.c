@@ -154,6 +154,7 @@ CartridgeArea->Cs2WriteByte(addr, val);
 #endif
 //////////////////////////////////////////////////////////////////////////////
 
+
 u16 FASTCALL Cs2ReadWord(u32 addr) {
   u16 val = 0;
   addr &= 0xFFFFF; // fix me(I should really have proper mapping)
@@ -195,7 +196,31 @@ u16 FASTCALL Cs2ReadWord(u32 addr) {
                   return Cs2Area->reg.CR4;
     case 0x90028:
     case 0x9002A: return Cs2Area->reg.MPEGRGB;
+    case 0x18000:
     case 0x98000:
+
+                  //FIX word-read de sectores: el BIOS lee datos con MOV.W y este camino
+                  //no existia (solo info transfers) -> devolvia 0 sin contar, el conteo
+                  //de EndDataTransfer nunca cuadraba y el BIOS reintentaba eterno.
+                  if (Cs2Area->datatranstype != CDB_DATATRANSTYPE_INVALID)
+                  {
+                     if (Cs2Area->datanumsecttrans < Cs2Area->datasectstotrans)
+                     {
+                        if (Cs2Area->datatranspartition->block[Cs2Area->datatranssectpos + Cs2Area->datanumsecttrans] == NULL)
+                           return 0;
+                        const u8 *ptr = &Cs2Area->datatranspartition->block[Cs2Area->datatranssectpos + Cs2Area->datanumsecttrans]->data[Cs2Area->datatransoffset];
+
+                        val = *((const u16 *) ptr);
+                        Cs2Area->cdwnum += 2;
+                        Cs2Area->datatransoffset += 2;
+                        if (Cs2Area->datatransoffset >= Cs2Area->datatranspartition->block[Cs2Area->datatranssectpos + Cs2Area->datanumsecttrans]->size)
+                        {
+                           Cs2Area->datatransoffset = 0;
+                           Cs2Area->datanumsecttrans++;
+                        }
+                        return val;
+                     }
+                  }
                   // transfer info
                   switch (Cs2Area->infotranstype) {
                      case 0:
@@ -2204,6 +2229,7 @@ void Cs2ResetSelector(void) {
      }
 
      if (Cs2Area->blockfreespace > 0) Cs2Area->isbufferfull = 0;
+
      if (Cs2Area->blockfreespace == MAX_BLOCKS)
      {
         Cs2Area->isonesectorstored = 0;

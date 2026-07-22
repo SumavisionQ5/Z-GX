@@ -854,7 +854,16 @@ void SucDmaCheck(scudmainfo_struct * dma, int time) {
 
     }
     else {
-      SucDmaExec(dma, &atime);
+      //FIX cd-dma: si la fuente es el CD block (0x25818000), completar la
+      //transferencia en este slice. El CS2 levanta DRDY al instante y los juegos
+      //cortan la lectura cuando el time budget dejaba el DMA a medias (sector
+      //truncado -> pantalla negra tras SEGA en juegos que cargan por SCU DMA).
+      if ((dma->ReadAddress & 0x0FFFFF00) == 0x05818000) {
+        int _cdtime = dma->TransferNumber + 64;
+        SucDmaExec(dma, &_cdtime);
+      } else {
+        SucDmaExec(dma, &atime);
+      }
       if (dma->TransferNumber <= 0) {
         ScuSendDMAEnd(dma->mode);
       }
