@@ -1,5 +1,9 @@
 
 
+#include <stdio.h>
+#include <string.h>
+#include <malloc.h>
+#include <pngu.h>
 #include "gui.h"
 #include "../peripheral.h"
 #include "../sgx/sgx.h"
@@ -322,6 +326,83 @@ static void gui_DrawItems(GuiItems *items, u32 width, u32 height)
 
 }
 
+//BOXART: caratula del juego seleccionado (PNG en sd:/apps/SetaGX/art/)
+#define BOXART_W  128
+#define BOXART_H  192
+#define BOXART_SZ (BOXART_W * BOXART_H * 2)
+static u8 *boxart_data = NULL;
+static char boxart_name[256] = {0};
+static u32 boxart_ok = 0;
+static u32 boxart_w = 0, boxart_h = 0;
+static GXTexObj boxart_tobj;
+
+static void __gui_LoadBoxart(String *str)
+{
+	char name[256];
+	u32 len = (str->len < 250) ? str->len : 250;
+	memcpy(name, str->data, len);
+	name[len] = 0;
+	for (s32 i = (s32)len - 1; i > 0; --i) {
+		if (name[i] == '.') { name[i] = 0; break; }
+	}
+	if (strcmp(name, boxart_name) == 0) return;
+	strcpy(boxart_name, name);
+	boxart_ok = 0;
+	if (!boxart_data) {
+		boxart_data = (u8*) memalign(32, BOXART_SZ);
+		if (!boxart_data) return;
+	}
+	char path[512];
+	snprintf(path, sizeof(path), "sd:/apps/SetaGX/art/%s.png", name);
+	IMGCTX ctx = PNGU_SelectImageFromDevice(path);
+	if (!ctx) return;
+	PNGUPROP prop;
+	if (PNGU_GetImageProperties(ctx, &prop) == PNGU_OK) {
+		u32 w = (prop.imgWidth  + 3) & ~3;
+		u32 h = (prop.imgHeight + 3) & ~3;
+		if (w <= BOXART_W && h <= BOXART_H) {
+			if (PNGU_DecodeTo4x4RGB5A3(ctx, w, h, boxart_data, 255) == PNGU_OK) {
+				boxart_w = w; boxart_h = h;
+				DCFlushRange(boxart_data, BOXART_SZ);
+				boxart_ok = 1;
+			}
+		}
+	}
+	PNGU_ReleaseImageContext(ctx);
+}
+
+static void __gui_DrawBoxart(void)
+{
+	if (!boxart_ok) return;
+	GX_SetScissor(0, 0, 640, 480);
+	GX_ClearVtxDesc();
+	GX_SetVtxDesc(GX_VA_POS, GX_DIRECT);
+	GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
+	GX_SetVtxDesc(GX_VA_TEX0, GX_DIRECT);
+	GX_SetNumChans(1);
+	GX_SetNumTexGens(1);
+	GX_SetNumTevStages(1);
+	GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
+	GX_SetTevColorOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+	GX_SetTevColorIn(GX_TEVSTAGE0, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO, GX_CC_TEXC);
+	GX_SetTevAlphaOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+	GX_SetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_KONST);
+	GX_SetTevKAlphaSel(GX_TEVSTAGE0, GX_TEV_KASEL_1);
+	GX_SetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0);
+	GX_SetTexCoordGen(GX_TEXCOORD0, GX_TG_MTX2x4, GX_TG_TEX0, MTX_IDENTITY);
+	GX_InitTexObj(&boxart_tobj, boxart_data, boxart_w, boxart_h, GX_TF_RGB5A3, GX_CLAMP, GX_CLAMP, GX_FALSE);
+	GX_InitTexObjLOD(&boxart_tobj, GX_LINEAR, GX_LINEAR, 0, 0, 0, GX_DISABLE, GX_DISABLE, GX_ANISO_1);
+	GX_InvalidateTexAll();
+	GX_LoadTexObj(&boxart_tobj, GX_TEXMAP0);
+	GX_SetTexCoordScaleManually(GX_TEXCOORD0, GX_TRUE, 1, 1);
+	GX_Begin(GX_QUADS, GX_VTXFMT4, 4);
+		GX_Position2u16(245, 6);   GX_Color1u16(0xFFFF); GX_TexCoord2u8(0, 0);
+		GX_Position2u16(317, 6);   GX_Color1u16(0xFFFF); GX_TexCoord2u8(boxart_w, 0);
+		GX_Position2u16(317, 114); GX_Color1u16(0xFFFF); GX_TexCoord2u8(boxart_w, boxart_h);
+		GX_Position2u16(245, 114); GX_Color1u16(0xFFFF); GX_TexCoord2u8(0, boxart_h);
+	GX_End();
+}
+
 void gui_Draw(GuiItems *items)
 {
 	GX_SetLineWidth(2 << 2, 0);
@@ -391,6 +472,8 @@ void gui_Draw(GuiItems *items)
 	GX_End();
 
 	gui_DrawItems(items, 240, 216);
+	if (items->count && items->cursor < items->count) __gui_LoadBoxart(&items->item[items->cursor]);
+	__gui_DrawBoxart();
 
 	GX_SetScissor(0, 0, 640, 480);
 	gui_DrawControllers();
