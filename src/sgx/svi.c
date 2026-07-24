@@ -2,6 +2,9 @@
 #include <malloc.h>
 #include "svi.h"
 #include "sgx.h"
+static volatile u32 svi_retrace = 0;
+static void __svi_RetraceCB(u32 cnt) { (void)cnt; svi_retrace++; }
+void SVI_InitRetrace(void) { VIDEO_SetPostRetraceCallback(__svi_RetraceCB); }
 
 #define COLOR_BLACK        (0x10801080)
 
@@ -55,6 +58,7 @@ void SVI_Init(void)
 	VIDEO_Configure(rmode);
 	VIDEO_Flush();
 	VIDEO_WaitVSync();
+	VIDEO_SetPostRetraceCallback(__svi_RetraceCB);
 
 	// Initialize GX
 	gp_fifo = memalign(32, DEFAULT_FIFO_SIZE);
@@ -283,12 +287,18 @@ void SVI_ClearFrame(void)
 
 }
 
+//FIX vsync: contador de retrazos. Antes SVI_SwapBuffers esperaba un retrace
+//entero si el frame tardaba <16ms, perdiendo un ciclo completo (Daytona 44fps
+//con solo ~14ms de trabajo). Ahora solo espera si aun no paso ningun retrace.
 void SVI_SwapBuffers(u32 wait_vsync)
 {
+	(void)wait_vsync;
 	VIDEO_SetNextFramebuffer(xfb[fbsel]);
 	VIDEO_Flush();
-	if (wait_vsync) {
+	//Esperar solo si el frame termino antes del proximo retrace
+	if (svi_retrace == 0) {
 		VIDEO_WaitVSync();
 	}
+	svi_retrace = 0;
 	fbsel ^= 1;
 }

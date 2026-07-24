@@ -912,6 +912,7 @@ void sh2_OnchipWrite32(u32 addr, u32 val)
 u8 sh2_Read8(u32 addr)
 {
 	if ((addr & 0xFE000000) == 0x06000000) { extern u8 *wram; return wram[(addr | ((addr >> 6) & 0x100000)) & 0x1FFFFF]; }
+	if ((addr & 0xFFF00000) == 0x00200000) { extern u8 *wram; return wram[addr & 0xFFFFF]; }
 	switch(addr >> 29) {
 		case 0x1:	//Cache-through area
 		case 0x5:	sh_ctx->cycles += mem_CyclesR(addr);
@@ -938,6 +939,7 @@ u8 sh2_Read8(u32 addr)
 u16 sh2_Read16(u32 addr)
 {
 	if ((addr & 0xFE000000) == 0x06000000) { extern u8 *wram; return *((u16*)(wram + ((addr | ((addr >> 6) & 0x100000)) & 0x1FFFFF))); }
+	if ((addr & 0xFFF00000) == 0x00200000) { extern u8 *wram; return *((u16*)(wram + (addr & 0xFFFFF))); }
 	switch(addr >> 29) {
 		case 0x1:	//Cache-through area
 		case 0x5:	sh_ctx->cycles += mem_CyclesR(addr);
@@ -963,6 +965,7 @@ u16 sh2_Read16(u32 addr)
 u32 sh2_Read32(u32 addr)
 {
 	if ((addr & 0xFE000000) == 0x06000000) { extern u8 *wram; return *((u32*)(wram + ((addr | ((addr >> 6) & 0x100000)) & 0x1FFFFF))); }
+	if ((addr & 0xFFF00000) == 0x00200000) { extern u8 *wram; return *((u32*)(wram + (addr & 0xFFFFF))); }
 	switch(addr >> 29) {
 		case 0x1:	//Cache-through area
 		case 0x5:	sh_ctx->cycles += mem_CyclesR(addr);
@@ -989,6 +992,7 @@ void sh2_Write8(u32 addr, u8 val)
 {
 	drc_CheckWrite(addr);
 	if ((addr & 0xFE000000) == 0x06000000) { extern u8 *wram; wram[(addr | ((addr >> 6) & 0x100000)) & 0x1FFFFF] = val; return; }
+	if ((addr & 0xFFF00000) == 0x00200000) { extern u8 *wram; wram[addr & 0xFFFFF] = val; return; }
 	switch(addr >> 29) {
 		case 0x1:	//Cache-through area
 		case 0x5:	sh_ctx->cycles += mem_CyclesW(addr);
@@ -1013,6 +1017,7 @@ void sh2_Write16(u32 addr, u16 val)
 {
 	drc_CheckWrite(addr);
 	if ((addr & 0xFE000000) == 0x06000000) { extern u8 *wram; *((u16*)(wram + ((addr | ((addr >> 6) & 0x100000)) & 0x1FFFFF))) = val; return; }
+	if ((addr & 0xFFF00000) == 0x00200000) { extern u8 *wram; *((u16*)(wram + (addr & 0xFFFFF))) = val; return; }
 	switch(addr >> 29) {
 		case 0x1:	//Cache-through area
 		case 0x5:	sh_ctx->cycles += mem_CyclesW(addr);
@@ -1037,6 +1042,7 @@ void sh2_Write32(u32 addr, u32 val)
 {
 	drc_CheckWrite(addr);
 	if ((addr & 0xFE000000) == 0x06000000) { extern u8 *wram; *((u32*)(wram + ((addr | ((addr >> 6) & 0x100000)) & 0x1FFFFF))) = val; return; }
+	if ((addr & 0xFFF00000) == 0x00200000) { extern u8 *wram; *((u32*)(wram + (addr & 0xFFFFF))) = val; return; }
 	switch(addr >> 29) {
 		case 0x1:	//Cache-through area
 		case 0x5:	sh_ctx->cycles += mem_CyclesW(addr);

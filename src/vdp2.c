@@ -373,7 +373,7 @@ void Vdp2VBlankOUT(void)
 	}
 	if (yabsys.flags & SYS_FLAGS_SHOW_FPS) osd_ProfDraw();
 	SGX_Vdp1SwapFramebuffer();
-	SVI_SwapBuffers((u32) ticks_to_millisecs((gettime() - current_ticks)) < 16);
+	SVI_SwapBuffers(0);
 
 	//XXX: Limit FPS.. we can do better than this
 	current_ticks = gettime();
