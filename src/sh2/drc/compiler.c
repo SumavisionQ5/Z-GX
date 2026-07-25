@@ -1600,7 +1600,7 @@ u32* _jit_GenBlock(u32* iblock, u32 addr)
 	ICInvalidateRange((void*) iblock_pos, len + 0x20);
 
 	/* Add length of block to drc code position */
-	if (drc_code_pos > drc_code_pos + (len >> 2) ) {
+	if ((drc_code_pos + (len >> 2)) >= DRC_CODE_SIZE) {
 		HashClearAll();
 		return _jit_GenBlock(iblock, addr);
 	}
