@@ -450,7 +450,7 @@ static void __Vdp1Convert16bpp(void)
 		GX_CopyTex(rgb_tex[back_fb], GX_FALSE);
 
 		//Mask RGB colors for dot color copy
-		GX_SetTevKColor(GX_KCOLOR0, (GXColor) {0x00, 0x21, 0x00, 0x00});
+		GX_SetTevKColor(GX_KCOLOR0, (GXColor) {0x00, 0x3F, 0x00, 0x00});
 		GX_SetBlendMode(GX_BM_BLEND, GX_BL_DSTALPHA, GX_BL_INVDSTALPHA, GX_LO_OR);
 		GX_Begin(GX_QUADS, GX_VTXFMT4, 4);
 			GX_Position2s16(0, 0);
@@ -504,7 +504,6 @@ u32 _vc_modes[8];
 u32 _vc_pmod_ecd[2];
 void SGX_Vdp1End(void)
 {
-	{ static u32 _fr=0; if(++_fr==600){ FILE*_f=fopen("sd:/vcop.txt","w"); if(_f){ u32 _k; for(_k=0;_k<16;_k++) fprintf(_f,"cmd%u=%u\n",_k,_vc_cmds[_k]); for(_k=0;_k<8;_k++) fprintf(_f,"mode%u=%u\n",_k,_vc_modes[_k]); fprintf(_f,"ecd_off=%u ecd_on=%u\n",_vc_pmod_ecd[0],_vc_pmod_ecd[1]); fprintf(_f,"SPCTL=%04X\n",Vdp2Regs->SPCTL); fclose(_f);} } }
 	SGX_SpriteConverterSet(0, SPRITE_NONE, 0);
 	SGX_SetVtxOffset(0, 0);
 	GX_SetScissor(0, 0, 640, 480);
