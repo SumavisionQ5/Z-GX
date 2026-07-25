@@ -1,4 +1,5 @@
 
+#include <stdio.h>
 #include <malloc.h>
 #include "svi.h"
 #include "sgx.h"
@@ -29,6 +30,7 @@ u32 scale_mtx = MTX_TEX_SCALED_N;
 u16 *xfb[2] = { NULL, NULL };
 u32 fbsel = 0;
 GXRModeObj *rmode;
+u32 svi_240p = 0;
 u32 tvmode;
 void *gp_fifo;
 u8 *fb_scale_tex ATTRIBUTE_ALIGN(32);		/*Texture for scaling x axis fb*/
@@ -38,6 +40,19 @@ void SVI_Init(void)
 {
 	VIDEO_Init();
 	rmode = VIDEO_GetPreferredMode(NULL);
+	{ //240p opcional para CRT: si existe el archivo, forzar modo single-field
+		FILE *_f240 = fopen("sd:/apps/SetaGX/240p.txt", "rb");
+		if (_f240) {
+			fclose(_f240);
+			if (rmode == &TVNtsc480IntDf || rmode == &TVNtsc480Int || rmode == &TVNtsc480Prog) {
+				rmode = &TVNtsc240Ds; svi_240p = 1;
+			} else if (rmode == &TVEurgb60Hz480IntDf || rmode == &TVEurgb60Hz480Int || rmode == &TVEurgb60Hz480Prog) {
+				rmode = &TVEurgb60Hz240Ds; svi_240p = 1;
+			} else if (rmode == &TVMpal480IntDf || rmode == &TVMpal480Int || rmode == &TVMpal480Prog) {
+				rmode = &TVMpal240Ds; svi_240p = 1;
+			}
+		}
+	}
 
 	Mtx GXmodelView2D;
 	Mtx44 perspective;
@@ -167,7 +182,7 @@ void SVI_SetResolution(u32 tvmd)
 	__VIClearFramebuffer(xfb[0], xfb_size, COLOR_BLACK);
 	__VIClearFramebuffer(xfb[1], xfb_size, COLOR_BLACK);
 
-	GX_SetDispCopyYScale((f32)(2 - vdp2_interlace));	//scale the XFB copy if not interlaced
+	GX_SetDispCopyYScale(svi_240p ? 1.0f : (f32)(2 - vdp2_interlace));
 	GX_Flush();
 }
 
@@ -176,7 +191,7 @@ void SVI_CopyXFB(u32 x, u32 y)
 	GX_SetDispCopyYScale(1.0);	//scale the XFB copy if not interlaced
 	GX_CopyDisp(xfb[fbsel] + (y * 704) + x, GX_TRUE);
 	GX_DrawDone();
-	GX_SetDispCopyYScale((f32)(2 - (vdp2_disp_h > 352)));	//scale the XFB copy if not interlaced
+	GX_SetDispCopyYScale(svi_240p ? 1.0f : (f32)(2 - (vdp2_disp_h > 352)));
 }
 
 
