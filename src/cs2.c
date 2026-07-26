@@ -197,7 +197,6 @@ u16 FASTCALL Cs2ReadWord(u32 addr) {
     case 0x90028:
     case 0x9002A: return Cs2Area->reg.MPEGRGB;
     case 0x18000:
-    case 0x98000:
 
                   //FIX word-read de sectores: el BIOS lee datos con MOV.W y este camino
                   //no existia (solo info transfers) -> devolvia 0 sin contar, el conteo
@@ -222,6 +221,8 @@ u16 FASTCALL Cs2ReadWord(u32 addr) {
                         return val;
                      }
                   }
+                  return val; //0x18000 (datos) termina aqui, no cae al info-read
+    case 0x98000:
                   // transfer info
                   switch (Cs2Area->infotranstype) {
                      case 0:
