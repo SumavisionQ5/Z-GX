@@ -2381,8 +2381,8 @@ void Cs2CalculateActualSize(void) {
 
      for (i = 0; i < casnumsect; i++)
      {
-        if (Cs2Area->partition[casbufno].block[cassectoffset])
-           Cs2Area->calcsize += (Cs2Area->partition[casbufno].block[cassectoffset]->size / 2);
+        if (Cs2Area->partition[casbufno].block[cassectoffset + i])
+           Cs2Area->calcsize += (Cs2Area->partition[casbufno].block[cassectoffset + i]->size / 2);
      }
   }
   else
