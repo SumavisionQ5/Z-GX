@@ -377,7 +377,7 @@ void SGX_Vdp1DrawFramebuffer(void)
 
 void SGX_Vdp1SwapFramebuffer(void)
 {
-	if ((~Vdp1Regs->FBCR & 2) | Vdp1External.manualchange) {
+	if (((Vdp1Regs->FBCR & 2) == 0) || Vdp1External.manualchange) {
 		front_fb ^= 1;	//NOTE: Wrong, should not swap
 		Vdp1External.manualchange = 0;
 	}
@@ -386,7 +386,7 @@ void SGX_Vdp1SwapFramebuffer(void)
 /*
 void SGX_Vdp1EraseFramebuffer(void)
 {
-	if ((~Vdp1Regs->FBCR & 2) | Vdp1External.manualchange) {
+	if (((Vdp1Regs->FBCR & 2) == 0) || Vdp1External.manualchange) {
 		vdp1_fb ^= 1;
 		Vdp1External.manualchange = 0;
 	}

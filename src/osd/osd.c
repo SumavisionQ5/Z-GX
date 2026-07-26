@@ -216,12 +216,12 @@ void osd_FPSDraw(u32 fps)
 	__osd_SetTev();
 	GX_SetCurrentMtx(MTX_IDENTITY_2X);
 
-	{ extern u32 snd_muted; u32 numc; { extern u32 drc_inval_count; extern u32 drc_flush_count; extern u32 drc_comp_count; numc = sprintf(tstr, "FPS:%2d I:%u C:%u F:%u%s", fps, drc_inval_count, drc_comp_count, drc_flush_count, snd_muted ? " SND OFF" : ""); drc_inval_count = 0; drc_comp_count = 0; drc_flush_count = 0; }
+	{ extern u32 snd_muted; u32 numc; numc = sprintf(tstr, "FPS:%2d%s", fps, snd_muted ? " SND OFF" : "");
 	GX_SetTevKColor(GX_KCOLOR0, (GXColor) {0xBB, 0xFF, 0xCC, 0xFF});
 	__osd_DrawText(0, 0, tstr, numc); }
 
 	GX_SetTexCoordScaleManually(GX_TEXCOORD0, GX_TRUE, 8, 1);
-	{ extern u32 snd_muted; GX_SetDispCopySrc(0, 0, 28*16, 16); }
+	{ extern u32 snd_muted; GX_SetDispCopySrc(0, 0, 8*16, 16); }
 	SVI_CopyXFB(32, 24);
 }
 

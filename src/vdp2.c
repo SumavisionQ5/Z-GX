@@ -368,10 +368,10 @@ void Vdp2VBlankOUT(void)
 		Vdp1NoDraw();	//Do nothing
 		SVI_ClearFrame();
 	}
-	if (yabsys.flags & SYS_FLAGS_SHOW_FPS) {
+	if (1) { // FPS siempre activo
 		FPSDisplay();
 	}
-	if (yabsys.flags & SYS_FLAGS_SHOW_FPS) osd_ProfDraw();
+	//if (yabsys.flags & SYS_FLAGS_SHOW_FPS) osd_ProfDraw(); // overlay VDP quitado
 	SGX_Vdp1SwapFramebuffer();
 	SVI_SwapBuffers(0);
 
