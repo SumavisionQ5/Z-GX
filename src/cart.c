@@ -98,6 +98,7 @@ static u16* cs0_1MBRamGetPCAddr(u32 pc)
 static u8 cs0_4MBRamRead8(u32 addr)
 {
 	u32 mask = (1 << ((addr >> 20) & 0x1F)) & 0xF0;
+	addr &= 0x3FFFFF;
 	if (mask) {
 		return cart.data[addr];
 	}
@@ -108,6 +109,7 @@ static u16 cs0_4MBRamRead16(u32 addr)
 {
 	u32 mask = (1 << ((addr >> 20) & 0x1F)) & 0xF0;
 	if (mask) {
+        addr &= 0x3FFFFF;
 		return *((u16*)(cart.data + addr));
 	}
 	return 0xFFFF;
@@ -117,6 +119,7 @@ static u32 cs0_4MBRamRead32(u32 addr)
 {
 	u32 mask = (1 << ((addr >> 20) & 0x1F)) & 0xF0;
 	if (mask) {
+        addr &= 0x3FFFFF;
 		return *((u32*)(cart.data + addr));
 	}
 	return 0xFFFFFFFF;
@@ -126,6 +129,7 @@ static void cs0_4MBRamWrite8(u32 addr, u8 val)
 {
 	u32 mask = (1 << ((addr >> 20) & 0x1F)) & 0xF0;
 	if (mask) {
+        addr &= 0x3FFFFF;
 		cart.data[addr] = val;
 	}
 }
@@ -134,6 +138,7 @@ static void cs0_4MBRamWrite16(u32 addr, u16 val)
 {
 	u32 mask = (1 << ((addr >> 20) & 0x1F)) & 0xF0;
 	if (mask) {
+        addr &= 0x3FFFFF;
 		*((u16*)(cart.data + addr)) = val;
 	}
 }
@@ -142,6 +147,7 @@ static void cs0_4MBRamWrite32(u32 addr, u32 val)
 {
 	u32 mask = (1 << ((addr >> 20) & 0x1F)) & 0xF0;
 	if (mask) {
+        addr &= 0x3FFFFF;
 		*((u32*)(cart.data + addr)) = val;
 	}
 }
@@ -196,17 +202,17 @@ static u16* cs0_RomGetPCAddr(u32 pc)
 /*CS1 area RW functions (This is used for determining CS0 cart type)*/
 u8 cs1_Read8(u32 addr)
 {
-	return cart.id | (-(addr != 0xFFFFFF));
+	return cart.id | (-((addr & 0xFFFFFF) != 0xFFFFFF));
 }
 
 u16 cs1_Read16(u32 addr)
 {
-	return cart.id | (-(addr != 0xFFFFFE));
+	return cart.id | (-((addr & 0xFFFFFF) != 0xFFFFFE));
 }
 
 u32 cs1_Read32(u32 addr)
 {
-	return cart.id | (-(addr != 0xFFFFFC));
+	return cart.id | (-((addr & 0xFFFFFF) != 0xFFFFFC));
 }
 
 void cs1_Write8(u32 addr, u8 val)   {/*Does nothing*/}

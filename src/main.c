@@ -518,7 +518,7 @@ int CoreExec()
 	yinit.sndcoretype = sounddriverselect;
 	yinit.cdcoretype = CDCORE_ISO;
 	yinit.m68kcoretype = m68kdriverselect;
-	yinit.carttype = 0;
+	yinit.carttype = 2;
 	yinit.regionid = REGION_AUTODETECT;
 	if (!bioswith || ((fp = fopen(biospath, "rb")) == NULL)) {
 		yinit.biospath = NULL;
