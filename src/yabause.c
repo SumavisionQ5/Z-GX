@@ -261,6 +261,7 @@ void YabauseResetNoLoad(void) {
 #else
 	sh2_Reset(&msh2);
 #endif
+        { extern void HashClearAll(void); HashClearAll(); } //FIX limpiar dynarec al cargar juego (evita ejecutar codigo del juego anterior)
 	YabauseStopSlave();
 	memset(wram, 0, 0x200000);
 
