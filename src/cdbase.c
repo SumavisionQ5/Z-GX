@@ -54,6 +54,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
 #include "cdbase.h"
 #include "error.h"
 #include "debug.h"
+#include <libchdr/chd.h>
 
 static int LoadCHD(const char *chd_filename, FILE *iso_file);
 static int ISOCDReadSectorFADFromCHD(u32 FAD, void *buffer);
@@ -964,8 +965,36 @@ static int ISOCDInit(const char * iso) {
 
 //////////////////////////////////////////////////////////////////////////////
 
+typedef struct ChdInfo_ {
+  chd_file *chd;
+  core_file * image_file;
+  const chd_header * header;
+  char * hunk_buffer;
+  int current_hunk_id;
+} ChdInfo;
+extern ChdInfo * pChdInfo;
 static void ISOCDDeInit(void) {
    int i, j, k;
+   // CHD: cerrar el archivo comprimido, NO hacer fclose por track (causaba DSI al salir)
+   if (imgtype == IMG_CHD) {
+      if (pChdInfo != NULL) {
+         if (pChdInfo->chd) chd_close(pChdInfo->chd);
+         free(pChdInfo);
+         pChdInfo = NULL;
+      }
+      if (disc.session) {
+         for (i = 0; i < disc.session_num; i++) {
+            if (disc.session[i].track) {
+               free(disc.session[i].track);
+               disc.session[i].track = NULL;
+            }
+         }
+         free(disc.session);
+         disc.session = NULL; disc.session_num = 0;
+      }
+      return;
+   }
+   // BIN/CUE/ISO: cerrar los archivos por track
    if (disc.session)
    {
       for (i = 0; i < disc.session_num; i++)
@@ -977,8 +1006,6 @@ static void ISOCDDeInit(void) {
                if (disc.session[i].track[j].fp)
                {
                   fclose(disc.session[i].track[j].fp);
-
-                  // Make sure we don't close the same file twice
                   for (k = j+1; k < disc.session[i].track_num; k++)
                   {
                      if (disc.session[i].track[j].file_id == disc.session[i].track[k].file_id)
@@ -987,11 +1014,11 @@ static void ISOCDDeInit(void) {
                }
             }
             free(disc.session[i].track);
-            disc.session[i].track = NULL; //FIX double-free
+            disc.session[i].track = NULL;
          }
       }
       free(disc.session);
-      disc.session = NULL; disc.session_num = 0; //FIX double-free
+      disc.session = NULL; disc.session_num = 0;
    }
 }
 

@@ -753,11 +753,9 @@ void Cs2DeInit(void) {
       if (Cs2Area->cdi != NULL) {
          Cs2Area->cdi->DeInit();
       }
-
       free(Cs2Area);
    }
    Cs2Area = NULL;
-
    if (cdip)
       free(cdip);
    cdip = NULL;

@@ -229,13 +229,12 @@ int	YabauseInit(yabauseinit_struct *init)
 
 void YabauseDeInit(void) {
 #ifdef USE_SH2_OLD
-	SH2DeInit();
+        SH2DeInit();
 #else
-	sh2_Deinit();
+        sh2_Deinit();
 #endif
-	if (SaveBackupRam(bupfilename))
+        if (SaveBackupRam(bupfilename))
          YabSetError(YAB_ERR_FILEWRITE, (void *)bupfilename);
-
    cart_Deinit();
    Cs2DeInit();
    ScuDeInit();
