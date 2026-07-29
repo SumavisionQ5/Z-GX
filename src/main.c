@@ -346,6 +346,23 @@ u32 menu_Handle(void)
 			filename_items.cursor--;
 		}
 	}
+	else if(buttons & PAD_DI_LEFT) {
+		if (filename_items.cursor >= filename_items.disp_count)
+			filename_items.cursor -= filename_items.disp_count;
+		else
+			filename_items.cursor = 0;
+		if (filename_items.disp_offset >= filename_items.disp_count)
+			filename_items.disp_offset -= filename_items.disp_count;
+		else
+			filename_items.disp_offset = 0;
+	}
+	else if(buttons & PAD_DI_RIGHT) {
+		filename_items.cursor += filename_items.disp_count;
+		if (filename_items.cursor >= filename_items.count)
+			filename_items.cursor = filename_items.count - 1;
+		if (filename_items.disp_offset + filename_items.disp_count < filename_items.count)
+			filename_items.disp_offset += filename_items.disp_count;
+	}
 	else if (buttons & btn_a) {	//Uses the C button as A button
 		if (filename_items.count && filename_items.cursor < filename_items.count) {
 			//Hold R to turn on FPS counter
