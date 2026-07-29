@@ -3515,7 +3515,7 @@ partition_struct * Cs2FilterData(filter_struct * curfilter, int isaudio)
      if (condresults == 1)
      {
         Cs2Area->lastbuffer = curfilter->condtrue;
-        if (curfilter->condtrue >= MAX_SELECTORS) { FILE*_f=fopen("sd:/chd.txt","a"); if(_f){fprintf(_f,"FILTRO MALO condtrue=%u\n",(unsigned)curfilter->condtrue);fclose(_f);} return NULL; } //FIX filtro
+        if (curfilter->condtrue >= MAX_SELECTORS) return NULL; //FIX filtro
         fltpartition = &Cs2Area->partition[curfilter->condtrue];
         break;
      }
@@ -3525,7 +3525,7 @@ partition_struct * Cs2FilterData(filter_struct * curfilter, int isaudio)
 
         if (curfilter->condfalse == 0xFF)
            return NULL;
-        if (curfilter->condfalse >= MAX_SELECTORS) { FILE*_f=fopen("sd:/chd.txt","a"); if(_f){fprintf(_f,"FILTRO MALO condfalse=%u\n",(unsigned)curfilter->condfalse);fclose(_f);} return NULL; } //FIX filtro
+        if (curfilter->condfalse >= MAX_SELECTORS) return NULL; //FIX filtro
         // loop and try filter that was connected to the false connector
         curfilter = &Cs2Area->filter[curfilter->condfalse];
      }

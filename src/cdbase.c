@@ -893,7 +893,6 @@ static int ISOCDInit(const char * iso) {
    memset(isoTOC, 0xFF, 0xCC * 2);
    memset(&disc, 0, sizeof(disc));
    iso_cd_status = 0;
-   {FILE*_f=fopen("sd:/chd.txt","a");if(_f){fprintf(_f,"ISOCDInit: %s\n",iso?iso:"(null)");fclose(_f);}}
 
    if (!iso)
       return -1;
@@ -931,7 +930,6 @@ static int ISOCDInit(const char * iso) {
      else if (stricmp(ext, ".CHD") == 0)
      {
        // It's a CHD
-       {FILE*_f=fopen("sd:/chd.txt","a");if(_f){fprintf(_f,"LoadCHD por extension: %s\n",iso);fclose(_f);}}
        imgtype = IMG_CHD;
        ret = LoadCHD(iso, iso_file);
      }
@@ -1142,17 +1140,15 @@ ChdInfo * pChdInfo = NULL;
 
 
 int checkCHD(const char *filename ) {
-
   chd_file *chd;
   chd_error error = chd_open(filename, CHD_OPEN_READ, NULL, &chd);
-  {FILE*_f=fopen("sd:/chd.txt","a");if(_f){fprintf(_f,"chd_open %s -> err=%d\n",filename,(int)error);fclose(_f);}}
   if (error != CHDERR_NONE) {
     return -1;
   }
   chd_close(chd);
   return 0;
-
 }
+
 
 static int LoadCHD(const char *chd_filename, FILE *iso_file)
 {
@@ -1185,7 +1181,6 @@ static int LoadCHD(const char *chd_filename, FILE *iso_file)
   int num_tracks = 0;
 
   chd_error error = chd_open(chd_filename, CHD_OPEN_READ, NULL, &pChdInfo->chd);
-  {FILE*_f=fopen("sd:/chd.txt","a");if(_f){fprintf(_f,"LoadCHD: buf=%p chd_open err=%d\n",(void*)buf,(int)error);fclose(_f);}}
   if (error != CHDERR_NONE) {
     return -1;
   }
@@ -1212,7 +1207,6 @@ static int LoadCHD(const char *chd_filename, FILE *iso_file)
     }
 
     trk[num_tracks].ctl_addr = 0x01; trk[num_tracks].sector_size = 2352; //FIX: default seguro para types no reconocidos
-    {FILE*_f=fopen("sd:/chd.txt","a");if(_f){fprintf(_f,"TRK %d: n=%d type=%s fr=%d pg=%d\n",num_tracks,trak_number,track_type,frame,pregap);fclose(_f);}}
     trk[num_tracks].pregap = pregap;
     trk[num_tracks].postgap = postgap;
 
@@ -1357,7 +1351,6 @@ static int LoadCHD(const char *chd_filename, FILE *iso_file)
   }
 
   memcpy(disc.session[0].track, trk, num_tracks * sizeof(track_info_struct));
-  {FILE*_f=fopen("sd:/chd.txt","a");if(_f){fprintf(_f,"POST-COPY t0: ss=%u ctl=%02X lfo=%u\n",(unsigned)disc.session[0].track[0].sector_size,(unsigned)disc.session[0].track[0].ctl_addr,(unsigned)disc.session[0].track[0].logframeofs);fclose(_f);}}
 
   pChdInfo->hunk_buffer = malloc(pChdInfo->header->hunkbytes);
   chd_read(pChdInfo->chd, 0, pChdInfo->hunk_buffer);
@@ -1374,8 +1367,6 @@ void chd_CheckCanary(const char* who)
 	if (_dead) return;
 	if (disc.session && disc.session[0].track && disc.session[0].track[0].sector_size > 2448) {
 		_dead = 1;
-		FILE*_f=fopen("sd:/chd.txt","a");
-		if(_f){ extern void* Cs2Area; extern unsigned int cs2_sizeof(void); fprintf(_f,"PISADOR tras %s ss0=%u cs2=%p cs2end=%p trk=%p\n", who, (unsigned)disc.session[0].track[0].sector_size, (void*)Cs2Area, (void*)((char*)Cs2Area+cs2_sizeof()), (void*)disc.session[0].track); fclose(_f); }
 	}
 }
 static int ISOCDReadSectorFADFromCHD(u32 FAD, void *buffer) {
@@ -1423,7 +1414,7 @@ static int ISOCDReadSectorFADFromCHD(u32 FAD, void *buffer) {
     pChdInfo->current_hunk_id = hunkid;
   }
 
-  if (track->sector_size > 2448 || (u32)hunk_offset + track->sector_size > pChdInfo->header->hunkbytes) { FILE*_f=fopen("sd:/chd.txt","a"); if(_f){fprintf(_f,"BAD FAD=%u ss=%u ho=%d t=%p base=%p ss0=%u ntrk=%d\n",(unsigned)FAD,(unsigned)track->sector_size,hunk_offset,(void*)track,(void*)disc.session[0].track,(unsigned)disc.session[0].track[0].sector_size,disc.session[0].track_num);fclose(_f);} return 0; }
+  if (track->sector_size > 2448 || (u32)hunk_offset + track->sector_size > pChdInfo->header->hunkbytes) { return 0; }
   if (track->ctl_addr == 0x01) {
     for (int i = 0; i < track->sector_size; i += 2) {
       ((char*)buffer)[i] = pChdInfo->hunk_buffer[hunk_offset + i + 1];
