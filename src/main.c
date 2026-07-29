@@ -246,42 +246,12 @@ s32 games_LoadList()
 	games_filecount = 0;
 
 	while ((entry = readdir(dp))) {
-		char *name = entry->d_name;
-		if (name[0] == '.') continue;
-		// Intentar como subcarpeta
-		char subpath[512];
-		sprintf(subpath, "%s/%s", games_dir, name);
-		DIR *sdp = opendir(subpath);
-		if (sdp) {
-			// Es subcarpeta: buscar .cue/.chd adentro
-			struct dirent *sentry;
-			while ((sentry = readdir(sdp))) {
-				char *sname = sentry->d_name;
-				u32 slen = strlen(sname);
-				if (slen > 4 && (!strcasecmp(sname + slen - 4, ".cue") || !strcasecmp(sname + slen - 4, ".chd"))) {
-					// Guardar "subcarpeta/archivo"
-					char rel[400];
-					sprintf(rel, "%s/%s", name, sname);
-					u32 rlen = strlen(rel) + 1;
-					char *dst = &game_name_strings[str_pos];
-					strcpy(dst, rel);
-					filename_items.item[games_filecount].len = rlen;
-					filename_items.item[games_filecount].data = dst;
-					games_filecount++;
-					str_pos += rlen;
-					break; // solo el primer cue/chd de la carpeta
-				}
-			}
-			closedir(sdp);
-			continue;
-		}
-		// Es archivo suelto
-		u32 len = strlen(name) + 1;
-		char *str_dst = &game_name_strings[str_pos];
-		strcpy(str_dst, name);
-		if (len > 4 && (!strcasecmp(name + len - 5, ".cue") || !strcasecmp(name + len - 5, ".chd"))) {
+		u32 len = strlen(entry->d_name) + 1;
+		if (len > 5 && (!strcasecmp(entry->d_name + len - 5, ".cue") || !strcasecmp(entry->d_name + len - 5, ".chd"))) {
+			char *str_dst = &game_name_strings[str_pos];
+			strcpy(str_dst, entry->d_name);
 			filename_items.item[games_filecount].len = len;
-			filename_items.item[games_filecount].data = &game_name_strings[str_pos];
+			filename_items.item[games_filecount].data = str_dst;
 			games_filecount++;
 			str_pos += len;
 		}
