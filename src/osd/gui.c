@@ -543,5 +543,12 @@ void gui_Draw(GuiItems *items)
 		cursor_inc = -cursor_inc;
 	}
 
+	{
+		extern int cart_enabled;
+		static char _cm[24];
+		sprintf(_cm, "CART 4MB:%s", cart_enabled ? "ON" : "OFF");
+		String _cs; _cs.len = strlen(_cm); _cs.data = _cm;
+		gui_DrawString(242, 226, 320, _cs);
+	}
 	GX_SetLineWidth(1 << 2, 0);
 }

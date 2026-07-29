@@ -161,6 +161,7 @@ void TexCopy_LoRes(u32 w, u32 h);
 
 
 static s32 selected = 0, start = 0;
+int cart_enabled = 0; //toggle cartucho RAM 4MB desde el menu (Z)
 static s32 selectedcart = 7;
 static int bioswith = 0;
 static int frameskipoff = 0;
@@ -294,6 +295,7 @@ u32 menu_Handle(void)
 	u32 buttons;
 	per_updatePads();
 	buttons = PER_BUTTONS_DOWN(0);
+	{ static u32 _cpv=0; u32 _cn=((PER_BUTTONS_HELD(0)&(PAD_DI_L|PAD_DI_R))==(PAD_DI_L|PAD_DI_R)); if(_cn && !_cpv) cart_enabled^=1; _cpv=_cn; } //TOGGLE cart 4MB con L+R
 	{
 		u32 held = PER_BUTTONS_HELD(0);
 		static int hold_frames = 0;
@@ -531,7 +533,7 @@ int CoreExec()
 	yinit.sndcoretype = sounddriverselect;
 	yinit.cdcoretype = CDCORE_ISO;
 	yinit.m68kcoretype = m68kdriverselect;
-	yinit.carttype = 2;
+	yinit.carttype = cart_enabled ? 2 : 0;
 	yinit.regionid = REGION_AUTODETECT;
 	if (!bioswith || ((fp = fopen(biospath, "rb")) == NULL)) {
 		yinit.biospath = NULL;
