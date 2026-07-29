@@ -550,5 +550,12 @@ void gui_Draw(GuiItems *items)
 		String _cs; _cs.len = strlen(_cm); _cs.data = _cm;
 		gui_DrawString(242, 226, 320, _cs);
 	}
+	{
+		extern int p240_pref;
+		static char _pm[20];
+		sprintf(_pm, "240p:%s", p240_pref ? "ON" : "OFF");
+		String _ps; _ps.len = strlen(_pm); _ps.data = _pm;
+		gui_DrawString(242, 116, 320, _ps);
+	}
 	GX_SetLineWidth(1 << 2, 0);
 }

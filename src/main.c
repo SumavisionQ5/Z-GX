@@ -162,6 +162,7 @@ void TexCopy_LoRes(u32 w, u32 h);
 
 static s32 selected = 0, start = 0;
 int cart_enabled = 0; //toggle cartucho RAM 4MB desde el menu (Z)
+int p240_pref = 0; //preferencia 240p (refleja si existe 240p.txt)
 static s32 selectedcart = 7;
 static int bioswith = 0;
 static int frameskipoff = 0;
@@ -296,6 +297,7 @@ u32 menu_Handle(void)
 	per_updatePads();
 	buttons = PER_BUTTONS_DOWN(0);
 	{ static u32 _cpv=0; u32 _cn=((PER_BUTTONS_HELD(0)&(PAD_DI_L|PAD_DI_R))==(PAD_DI_L|PAD_DI_R)); if(_cn && !_cpv) cart_enabled^=1; _cpv=_cn; } //TOGGLE cart 4MB con L+R
+	{ static u32 _ppv=0; u32 _pn=((PER_BUTTONS_HELD(0)&(PAD_DI_L|PAD_DI_Y))==(PAD_DI_L|PAD_DI_Y)); if(_pn && !_ppv) { p240_pref^=1; if(p240_pref){ FILE*_pf=fopen("sd:/ZGX/240p.txt","wb"); if(_pf)fclose(_pf); } else { remove("sd:/ZGX/240p.txt"); } } _ppv=_pn; } //TOGGLE 240p con L+Y
 	{
 		u32 held = PER_BUTTONS_HELD(0);
 		static int hold_frames = 0;
@@ -447,6 +449,7 @@ int main(int argc, char **argv)
 		//Only load gamelist
 		sprintf(games_dir, "%s%s", device_path, "ZGX/games");
 		games_LoadList();
+	{ FILE *_p2f = fopen("sd:/ZGX/240p.txt", "rb"); if (_p2f) { p240_pref = 1; fclose(_p2f); } } //sincronizar indicador 240p con el archivo
 	}
 
 	//Copy the routes
