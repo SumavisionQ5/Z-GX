@@ -24,7 +24,7 @@ Copia la carpeta apps/ZGX a la carpeta apps de tu SD/USB. Estructura:
     sd:/ZGX/games/         los juegos (.chd, .cue, o subcarpetas)
     sd:/ZGX/bios/bios.bin  el BIOS
     sd:/ZGX/saves/         guardados
-    sd:/ZGX/art/           caratulas (PNG con el nombre del juego)
+    sd:/ZGX/art/           caratulas (PNG con el nombre exacto del juego 128x192)
     sd:/apps/ZGX/          boot.dol, icon.png, meta.xml
 
 BIOS NO INCLUIDO: coloca tu BIOS en sd:/ZGX/bios/bios.bin (recomendado region-libre v1.00).
