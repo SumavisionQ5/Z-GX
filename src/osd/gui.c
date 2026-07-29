@@ -326,7 +326,7 @@ static void gui_DrawItems(GuiItems *items, u32 width, u32 height)
 
 }
 
-//BOXART: caratula del juego seleccionado (PNG en sd:/apps/SetaGX/art/)
+//BOXART: caratula del juego seleccionado (PNG en sd:/ZGX/art/)
 #define BOXART_W  128
 #define BOXART_H  192
 #define BOXART_SZ (BOXART_W * BOXART_H * 2)
@@ -353,7 +353,7 @@ static void __gui_LoadBoxart(String *str)
 		if (!boxart_data) return;
 	}
 	char path[512];
-	snprintf(path, sizeof(path), "sd:/apps/SetaGX/art/%s.png", name);
+	snprintf(path, sizeof(path), "sd:/ZGX/art/%s.png", name);
 	IMGCTX ctx = PNGU_SelectImageFromDevice(path);
 	if (!ctx) return;
 	PNGUPROP prop;

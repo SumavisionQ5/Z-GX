@@ -246,32 +246,46 @@ s32 games_LoadList()
 	games_filecount = 0;
 
 	while ((entry = readdir(dp))) {
-		//Copy the string to memory
-		u32 len = 0;
-		char *str_src = entry->d_name;
-		char *str_dst = &game_name_strings[str_pos];
-		while (*str_src != 0) {
-			*str_dst = *str_src;
-			++len;
-			++str_dst;
-			++str_src;
+		char *name = entry->d_name;
+		if (name[0] == '.') continue;
+		// Intentar como subcarpeta
+		char subpath[512];
+		sprintf(subpath, "%s/%s", games_dir, name);
+		DIR *sdp = opendir(subpath);
+		if (sdp) {
+			// Es subcarpeta: buscar .cue/.chd adentro
+			struct dirent *sentry;
+			while ((sentry = readdir(sdp))) {
+				char *sname = sentry->d_name;
+				u32 slen = strlen(sname);
+				if (slen > 4 && (!strcasecmp(sname + slen - 4, ".cue") || !strcasecmp(sname + slen - 4, ".chd"))) {
+					// Guardar "subcarpeta/archivo"
+					char rel[400];
+					sprintf(rel, "%s/%s", name, sname);
+					u32 rlen = strlen(rel) + 1;
+					char *dst = &game_name_strings[str_pos];
+					strcpy(dst, rel);
+					filename_items.item[games_filecount].len = rlen;
+					filename_items.item[games_filecount].data = dst;
+					games_filecount++;
+					str_pos += rlen;
+					break; // solo el primer cue/chd de la carpeta
+				}
+			}
+			closedir(sdp);
+			continue;
 		}
-		++len;
-		*str_dst = '\0';
-		//XXX: Be careful with this implementation, can have problems
-		if (len > 4 && !strcmp(".cue", str_dst - 4)) {
-			filename_items.item[games_filecount].len = len;
-			filename_items.item[games_filecount].data = &game_name_strings[str_pos];
-			games_filecount++;
-			str_pos += len;
-		} else if (len > 4 && !strcmp(".chd", str_dst - 4)) {
+		// Es archivo suelto
+		u32 len = strlen(name) + 1;
+		char *str_dst = &game_name_strings[str_pos];
+		strcpy(str_dst, name);
+		if (len > 4 && (!strcasecmp(name + len - 5, ".cue") || !strcasecmp(name + len - 5, ".chd"))) {
 			filename_items.item[games_filecount].len = len;
 			filename_items.item[games_filecount].data = &game_name_strings[str_pos];
 			games_filecount++;
 			str_pos += len;
 		}
 	}
-
 	filename_items.count = games_filecount;
 	if (!filename_items.count) {
 		closedir(dp);
@@ -310,6 +324,18 @@ u32 menu_Handle(void)
 	u32 buttons;
 	per_updatePads();
 	buttons = PER_BUTTONS_DOWN(0);
+	{
+		u32 held = PER_BUTTONS_HELD(0);
+		static int hold_frames = 0;
+		if (held & (PAD_DI_UP | PAD_DI_DOWN)) {
+			hold_frames++;
+			if (hold_frames > 30 && (hold_frames % 3 == 0)) {
+				buttons |= (held & (PAD_DI_UP | PAD_DI_DOWN));
+			}
+		} else {
+			hold_frames = 0;
+		}
+	}
 	u32 btn_a = PAD_DI_C;
 	u32 btn_b = PAD_DI_B;
 	if (perpad[0].type == PAD_TYPE_GCPAD) {
@@ -447,13 +473,13 @@ int main(int argc, char **argv)
 			//Device not found notice
 		}
 		//Only load gamelist
-		sprintf(games_dir, "%s%s", device_path, "vgames/Saturn");
+		sprintf(games_dir, "%s%s", device_path, "ZGX/games");
 		games_LoadList();
 	}
 
 	//Copy the routes
-	sprintf(biospath, "%s%s", device_path, "apps/SetaGX/bios.bin");
-	sprintf(saves_dir, "%s%s", device_path, "saves/Saturn");
+	sprintf(biospath, "%s%s", device_path, "ZGX/bios/bios.bin");
+	sprintf(saves_dir, "%s%s", device_path, "ZGX/saves");
 
 	bioswith = 1;			//bioswith
 	selectedcart = 7;		//cartridge
