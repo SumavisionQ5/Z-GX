@@ -1121,9 +1121,20 @@ void sh2_SSH2InputCaptureWrite16(u32 addr, u16 data)
 	SH2 *sh = &ssh2;
 	OCR_FTCSR |= 0x80; // Set Input Capture Flag
 	OCR_FICR = OCR_FRC; // Copy FRC register to FICR
- 	// Time for an Interrupt?
 	if (OCR_TIER & 0x80) {
 		sh2_SetInterrupt(&ssh2, (OCR_VCRC >> 8) & 0x7F, (OCR_IPRB >> 8) & 0xF);
+	}
+	// Ejecutar el slave en el acto para que procese el ICF (patron Kronos)
+	// Ayuda a la sincronizacion master-slave. Ver NOTAS_BUG_NEGRO.md
+	{
+		static int _ic_depth = 0;
+		if (_ic_depth < 4) {
+			_ic_depth++;
+			SH2 *_save = sh_ctx;
+			sh2_Exec(&ssh2, 128);
+			sh_ctx = _save;
+			_ic_depth--;
+		}
 	}
 }
 
