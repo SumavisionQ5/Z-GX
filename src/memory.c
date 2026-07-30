@@ -424,6 +424,9 @@ void mem_Init(void)
 	memset(wram, 0x0, WRAM_SIZE);
 	memset(bios_rom, 0x0, BIOS_SIZE);
 	memset(bup_ram, 0x0, BACKUP_RAM_SIZE);
+	memset(Vdp1FrameBuffer, 0x0, 0x80000);
+	memset(Vdp1Ram, 0x0, 0x80000);
+	memset(SoundRam, 0x0, 0x80000);
 }
 
 void mem_Deinit(void)
