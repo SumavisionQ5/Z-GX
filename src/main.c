@@ -566,6 +566,7 @@ int CoreExec()
 
 	VIDEO_SetBlack(1);
 	SVI_SetResolution(0x00D2);
+		SVI_ClearXFB(); //limpiar XFB al cargar cada juego (evita basura del anterior al encadenar)
 	VIDEO_WaitVSync();
 
 	if ((ret = YabauseInit(&yinit)) == 0) {

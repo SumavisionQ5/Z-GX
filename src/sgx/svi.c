@@ -36,6 +36,12 @@ void *gp_fifo;
 u8 *fb_scale_tex ATTRIBUTE_ALIGN(32);		/*Texture for scaling x axis fb*/
 
 
+void SVI_ClearXFB(void)
+{
+	u32 xfb_size = 704 * 512 * VI_DISPLAY_PIX_SZ;
+	if (xfb[0]) __VIClearFramebuffer(xfb[0], xfb_size, COLOR_BLACK);
+	if (xfb[1]) __VIClearFramebuffer(xfb[1], xfb_size, COLOR_BLACK);
+}
 void SVI_Init(void)
 {
 	VIDEO_Init();
