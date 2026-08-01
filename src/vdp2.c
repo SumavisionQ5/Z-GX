@@ -320,7 +320,7 @@ static void FPSDisplay(void)
 	static int fpsframecount = 0;
 	static u64 fpsticks;
 	osd_FPSDraw(fps);
-	{ extern u32 drc_inval_count; static char _ib[32]; extern void osd_MsgAdd(u32,u32,u32,char*); }
+	{ }
 	{ extern u32 snd_muted; if (snd_muted) osd_MsgAdd(10, 30, 0xFF4040FF, "SND OFF"); }
 	fpsframecount++;
 
@@ -371,7 +371,7 @@ void Vdp2VBlankOUT(void)
 	if (1) { // FPS siempre activo
 		FPSDisplay();
 	}
-	//if (yabsys.flags & SYS_FLAGS_SHOW_FPS) osd_ProfDraw(); // overlay VDP quitado
+	osd_ProfDraw(); // overlay de perfilado reactivado para medir cuellos
 	SGX_Vdp1SwapFramebuffer();
 	SVI_SwapBuffers(0);
 
