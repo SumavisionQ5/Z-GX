@@ -344,8 +344,8 @@ u32 per_updatePads()
 				} else { //Normal Classic controller
 					perpad[per_num].type = PAD_TYPE_CLASSIC;
 				}
-				perpad[per_num].x = (s16) (wpad->exp.classic.ljs.pos.x);
-				perpad[per_num].y = (s16) (wpad->exp.classic.ljs.pos.y);
+					perpad[per_num].x = (s16)(wpad->exp.classic.ljs.pos.x) - (s16)(wpad->exp.classic.ljs.center.x);
+					perpad[per_num].y = (s16)(wpad->exp.classic.ljs.pos.y) - (s16)(wpad->exp.classic.ljs.center.y);
 				perpad[per_num].prev_btn = perpad[per_num].btn;
 				perpad[per_num].btn = wpad->btns_h;
 				per_ClassicToSat(per_num, &exit_code);
