@@ -371,7 +371,7 @@ void Vdp2VBlankOUT(void)
 	if (1) { // FPS siempre activo
 		FPSDisplay();
 	}
-	osd_ProfDraw(); // overlay de perfilado reactivado para medir cuellos
+	//osd_ProfDraw(); // perfilado desactivado - solo FPS visible
 	SGX_Vdp1SwapFramebuffer();
 	SVI_SwapBuffers(0);
 

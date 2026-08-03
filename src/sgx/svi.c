@@ -47,7 +47,7 @@ void SVI_Init(void)
 	VIDEO_Init();
 	rmode = VIDEO_GetPreferredMode(NULL);
 	{ //240p opcional para CRT: si existe el archivo, forzar modo single-field
-		FILE *_f240 = fopen("sd:/ZGX/240p.txt", "rb");
+		extern char g_device_path[16]; char _p240path[32]; sprintf(_p240path, "%sZGX/240p.txt", g_device_path); FILE *_f240 = fopen(_p240path, "rb");
 		if (_f240) {
 			fclose(_f240);
 			if (rmode == &TVNtsc480IntDf || rmode == &TVNtsc480Int || rmode == &TVNtsc480Prog) {

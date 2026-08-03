@@ -353,7 +353,7 @@ static void __gui_LoadBoxart(String *str)
 		if (!boxart_data) return;
 	}
 	char path[512];
-	snprintf(path, sizeof(path), "sd:/ZGX/art/%s.png", name);
+	extern char g_device_path[16]; snprintf(path, sizeof(path), "%sZGX/art/%s.png", g_device_path, name);
 	IMGCTX ctx = PNGU_SelectImageFromDevice(path);
 	if (!ctx) return;
 	PNGUPROP prop;
