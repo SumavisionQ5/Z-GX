@@ -146,6 +146,8 @@ static void per_GCToSat(u32 indx, u32 *exit_code)
 	*exit_code |= (btns & (PAD_BUTTON_START | PAD_TRIGGER_Z)) == (PAD_BUTTON_START | PAD_TRIGGER_Z);
 	if ((btns & (PAD_TRIGGER_L | PAD_TRIGGER_R | PAD_TRIGGER_Z)) == (PAD_TRIGGER_L | PAD_TRIGGER_R | PAD_TRIGGER_Z)) dump_memory();
 	{ static u32 _prev=0; u32 _now=((btns & (PAD_TRIGGER_L|PAD_TRIGGER_R|PAD_BUTTON_START))==(PAD_TRIGGER_L|PAD_TRIGGER_R|PAD_BUTTON_START)); extern u32 snd_muted; if(_now && !_prev) snd_muted ^= 1; _prev=_now; } //TOGGLE sonido L+R+START
+	{ static u32 _pp=0; u32 _pn=((btns & (PAD_TRIGGER_R|PAD_TRIGGER_Z))==(PAD_TRIGGER_R|PAD_TRIGGER_Z)); extern u32 _prof_on; if(_pn && !_pp) _prof_on ^= 1; _pp=_pn; } //TOGGLE overlay abajo R+Z
+	{ static u32 _sp=0; u32 _sn=((btns & (PAD_TRIGGER_R|PAD_BUTTON_X))==(PAD_TRIGGER_R|PAD_BUTTON_X)); extern u32 _skip_layer; if(_sn && !_sp){ _skip_layer = (_skip_layer+1) % 4; } _sp=_sn; } //CICLA skip capa R+X
 
 	//TODO: get the user defined bits for the buttons
 	u32 sat_btns =

@@ -33,6 +33,7 @@
 #include "sgx/sgx.h"
 #include "sgx/svi.h"
 
+u32 _prof_on = 0;
 u8 * Vdp2Ram;
 u8 * Vdp2ColorRam;
 
@@ -371,7 +372,7 @@ void Vdp2VBlankOUT(void)
 	if (1) { // FPS siempre activo
 		FPSDisplay();
 	}
-	//osd_ProfDraw(); // perfilado desactivado - solo FPS visible
+	{ extern u32 _prof_on; if (_prof_on) osd_ProfDraw(); } // overlay abajo, toggle R+Z
 	SGX_Vdp1SwapFramebuffer();
 	SVI_SwapBuffers(0);
 

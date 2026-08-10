@@ -214,14 +214,14 @@ void osd_FPSDraw(u32 fps)
 {
 	char tstr[64];
 	__osd_SetTev();
-	GX_SetCurrentMtx(MTX_IDENTITY_2X);
+	GX_SetCurrentMtx(MTX_IDENTITY);
 
-	{ extern u32 snd_muted; u32 numc; numc = sprintf(tstr, "FPS:%2d%s", fps, snd_muted ? " SND OFF" : "");
+	{ extern u32 snd_muted; u32 numc; numc = sprintf(tstr, "%2d", fps);
 	GX_SetTevKColor(GX_KCOLOR0, (GXColor) {0xBB, 0xFF, 0xCC, 0xFF});
 	__osd_DrawText(0, 0, tstr, numc); }
 
 	GX_SetTexCoordScaleManually(GX_TEXCOORD0, GX_TRUE, 8, 1);
-	{ extern u32 snd_muted; GX_SetDispCopySrc(0, 0, 8*16, 16); }
+	{ extern u32 snd_muted; GX_SetDispCopySrc(0, 0, 1*16, 10); }
 	SVI_CopyXFB(32, 24);
 }
 
@@ -262,6 +262,11 @@ void osd_ProfDraw(void)
           numc = sprintf(tstr, "IDLE:%u C:%u", drc_idle_count, drc_comp_count);
 	  __osd_DrawText(x, y, tstr, numc);
 	  drc_comp_count=0; drc_inval_count=0; drc_flush_count=0; drc_idle_count=0; }
+	{ extern u32 cfmt_dbg, bmw_dbg, bmconv_dbg, vdp2_disp_w, screen_enable; 
+		y += 8; numc = sprintf(tstr, "CF:%u", cfmt_dbg); __osd_DrawText(x, y, tstr, numc); 
+		y += 8; numc = sprintf(tstr, "BW:%u", bmw_dbg); __osd_DrawText(x, y, tstr, numc); 
+		y += 8; numc = sprintf(tstr, "SE:%u", screen_enable); __osd_DrawText(x, y, tstr, numc);
+		y += 8; numc = sprintf(tstr, "DW:%u", vdp2_disp_w); __osd_DrawText(x, y, tstr, numc); }
 	GX_SetTexCoordScaleManually(GX_TEXCOORD0, GX_TRUE, 8, 1);
 	GX_SetDispCopySrc(0, 0, (20*8), y+12);
 	SVI_CopyXFB(32, 320);
