@@ -930,7 +930,7 @@ extern void sh2_int_MACW(SH2 *sh, u32 inst);
 	PPCC_B(jit_endblock_test); 				/*Exit block*/ \
 	if (block_data.is_idle) { \
 		PPCC_ADDI(GP_PC, GP_PC, offset); PPCE_SAVE(GP_PC, pc); \
-		PPCC_ADDI(3, 0, 128); PPCC_B(jit_endblock_test); \
+		PPCC_ADDI(3, 0, 64); PPCC_B(jit_endblock_test); \
 	} else { \
 		PPCC_ADDI(GP_PC, GP_PC, offset);                        /*Mask off offset */ \
 	PPCE_SAVE(GP_PC, pc); } /* Save PC + cierra else idle */ \
@@ -985,14 +985,18 @@ extern void sh2_int_MACW(SH2 *sh, u32 inst);
 #define SH2JIT_BT			/* BT disp  10001001dddddddd */ \
 	u32 offset = (EXT_IMM8(disp) << 1) + 2; \
 	PPCC_ADDIS(GP_PC, 0, (curr_pc+2) >> 16);	/*Set high imm 16 bits */ \
-	PPCC_ORI(GP_PC, GP_PC, curr_pc+2);			/*Set low imm 16 bits */ \
-	PPCC_ANDI(GP_TMP, GP_SR, 0x0001);			/*Get T bit */ \
-	PPCC_BCF(2, 4); 							/*Branch if false (T!=0) */ \
-	PPCE_SAVE(GP_PC, pc);						/* Save PC */ \
-	PPCC_ADDI(3, 0, curr_cycles + 1); 			/*Return cycles in block*/ \
-	PPCC_B(jit_endblock_test); 				/*Exit block*/ \
-	PPCC_ADDI(GP_PC, GP_PC, offset);			/*Mask off offset */ \
-	PPCE_SAVE(GP_PC, pc);						/* Save PC */ \
+	PPCC_ORI(GP_PC, GP_PC, curr_pc+2);		/*Set low imm 16 bits */ \
+	PPCC_ANDI(GP_TMP, GP_SR, 0x0001);		/*Get T bit */ \
+	PPCC_BCF(2, 4);					/*Branch if false (T!=0) */ \
+	PPCE_SAVE(GP_PC, pc);				/* Save PC */ \
+	PPCC_ADDI(3, 0, curr_cycles + 1);		/*Return cycles in block*/ \
+	PPCC_B(jit_endblock_test);			/*Exit block*/ \
+	if (block_data.is_idle) { \
+		PPCC_ADDI(GP_PC, GP_PC, offset); PPCE_SAVE(GP_PC, pc); \
+		PPCC_ADDI(3, 0, 64); PPCC_B(jit_endblock_test); \
+	} else { \
+		PPCC_ADDI(GP_PC, GP_PC, offset);	/*Mask off offset */ \
+		PPCE_SAVE(GP_PC, pc); }			/* Save PC + cierra else */ \
 
 
 #define SH2JIT_BTS			/* BTS disp  10001101dddddddd */ \
