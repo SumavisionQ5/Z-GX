@@ -928,8 +928,12 @@ extern void sh2_int_MACW(SH2 *sh, u32 inst);
 	PPCE_SAVE(GP_PC, pc);						/* Save PC */ \
 	PPCC_ADDI(3, 0, curr_cycles + 1); 			/*Return cycles in block*/ \
 	PPCC_B(jit_endblock_test); 				/*Exit block*/ \
-	PPCC_ADDI(GP_PC, GP_PC, offset);			/*Mask off offset */ \
-	PPCE_SAVE(GP_PC, pc);						/* Save PC */ \
+	if (block_data.is_idle) { \
+		PPCC_ADDI(GP_PC, GP_PC, offset); PPCE_SAVE(GP_PC, pc); \
+		PPCC_ADDI(3, 0, 128); PPCC_B(jit_endblock_test); \
+	} else { \
+		PPCC_ADDI(GP_PC, GP_PC, offset);                        /*Mask off offset */ \
+	PPCE_SAVE(GP_PC, pc); } /* Save PC + cierra else idle */ \
 
 
 #define SH2JIT_BFS		/* BFS disp  10001111dddddddd */ \
@@ -1147,6 +1151,7 @@ struct BlockData {
 	u32 instr_count;
 	u32 cycle_count;
 	u32 entry_addr;
+	u32 is_idle;
 } block_data;
 
 #define IFC_SET_ENTRY(ofs) if((curr_pc+(ofs)) > addr) { entry_addr = (curr_pc+(ofs)); }
@@ -1164,6 +1169,7 @@ u16* _jit_GenIFCBlock(u32 addr)
 	u32 ld_regs = REG_NUM_SR;	// Allways have SR loaded
 	u32 st_regs = REG_NUM_SR;	// Allways have SR loaded
 	u32 entry_addr = 0;
+	u32 has_mem_write = 0; u32 idle_disp = 0; u32 idle_is_branch = 0;
 	while (bstate != BSTATE_END) {
 		u16 inst = *(inst_ptr++);
 		u32 ifc = 0;
@@ -1385,6 +1391,11 @@ u16* _jit_GenIFCBlock(u32 addr)
 				ifc |= IFC_IS_DELAY;} break;
 		}
 
+		{ u32 _op = ifc & 0xFF; 
+		if (_op==IFC_MOVBS||_op==IFC_MOVWS||_op==IFC_MOVLS||_op==IFC_MOVBM||_op==IFC_MOVWM||_op==IFC_MOVLM|| 
+		    _op==IFC_MOVBS0||_op==IFC_MOVWS0||_op==IFC_MOVLS0||_op==IFC_MOVBSG||_op==IFC_MOVWSG||_op==IFC_MOVLSG|| 
+		    _op==IFC_MOVBS4||_op==IFC_MOVWS4||_op==IFC_MOVLS4) has_mem_write = 1; 
+		if (_op==IFC_BF||_op==IFC_BT) { idle_is_branch = 1; idle_disp = (_jit_opcode & 0xFF); } }
 		ifc_array[instr_count] = ifc;
 		++instr_count;
 		curr_pc += 2;
@@ -1395,6 +1406,8 @@ u16* _jit_GenIFCBlock(u32 addr)
 	block_data.ld_regs = ld_regs;
 	block_data.instr_count = instr_count;
 	block_data.entry_addr = entry_addr;
+	block_data.is_idle = (idle_is_branch && (idle_disp >= 0x80) && !has_mem_write) ? 1 : 0;
+	if (block_data.is_idle) { extern u32 drc_idle_count; drc_idle_count++; }
 	{ extern void drc_MarkCodePage(u32); extern u32 drc_comp_count; drc_comp_count++; drc_MarkCodePage(entry_addr); drc_MarkCodePage(curr_pc); } //FIX cache stale + contador
 
 	return ret_ptr;
