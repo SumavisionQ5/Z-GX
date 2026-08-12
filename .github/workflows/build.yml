@@ -41,22 +41,51 @@ jobs:
           echo "=== 检查 png.h 是否就位 ==="
           find /opt/devkitpro/portlibs -name "png.h" 2>/dev/null || true
 
-      - name: 交叉编译并安装 libchdr
+      - name: 交叉编译并安装 libchdr（含 LZMA + miniz 依赖）
         run: |
           set -e
           export PATH="/opt/devkitpro/devkitPPC/bin:/opt/devkitpro/tools/bin:$PATH"
+
+          echo "=== 拉取 libchdr 源码 ==="
           git clone --depth=1 https://github.com/rtissera/libchdr deps/libchdr
           cd deps/libchdr
+
+          # 自动定位依赖目录（版本号可能变化）
+          LZMA_DIR=$(find deps -maxdepth 1 -type d -name "lzma*" | head -1)
+          MINIZ_DIR=$(find deps -maxdepth 1 -type d -name "miniz*" | head -1)
+          echo "LZMA 目录: $LZMA_DIR"
+          echo "MINIZ 目录: $MINIZ_DIR"
+
+          COMMON="-O2 -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64"
+          INCS="-Iinclude -I/opt/devkitpro/portlibs/ppc/include \
+                -I$LZMA_DIR/include -I$MINIZ_DIR"
+
+          echo "=== 编译 src/ ==="
           for f in src/*.c; do
             echo "编译 $f"
-            powerpc-eabi-gcc -O2 -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 \
-              -Iinclude -I/opt/devkitpro/portlibs/ppc/include \
-              -c "$f" -o "$(basename "$f" .c).o"
+            powerpc-eabi-gcc $COMMON $INCS -c "$f" -o "$(basename "$f" .c).o"
           done
+
+          echo "=== 编译 LZMA SDK（提供 CHDR_LzmaDec_* 符号）==="
+          # Z7_ST 宏是 LZMA SDK 必需的（见其 CMake 定义）
+          for f in $LZMA_DIR/src/LzmaDec.c $LZMA_DIR/src/Alloc.c; do
+            [ -f "$f" ] || continue
+            echo "编译 $f"
+            powerpc-eabi-gcc $COMMON -DZ7_ST $INCS -c "$f" -o "$(basename "$f" .c).o"
+          done
+
+          echo "=== 编译 miniz（提供 mz_inflate* 符号）==="
+          powerpc-eabi-gcc $COMMON $INCS -c $MINIZ_DIR/miniz.c -o miniz.o
+
+          echo "=== 打包静态库 ==="
           powerpc-eabi-ar rcs libchdr.a *.o
+
+          echo "=== 安装到 portlibs ==="
           mkdir -p /opt/devkitpro/portlibs/ppc/include/libchdr
           cp include/libchdr/*.h /opt/devkitpro/portlibs/ppc/include/libchdr/
           cp libchdr.a /opt/devkitpro/portlibs/ppc/lib/
+          echo "=== 验证缺失符号已解决 ==="
+          powerpc-eabi-nm libchdr.a | grep -E "CHDR_LzmaDec_|mz_inflate" | head -20
           echo "✅ libchdr 安装完成"
 
       - name: 从 GRRLIB 源码交叉编译并安装 libpngu
