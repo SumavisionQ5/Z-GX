@@ -282,6 +282,10 @@ void Vdp2VBlankIN(void) {
    //VidSoftVdp2DrawEnd();
    Vdp2Regs->TVSTAT |= 0x0008;
    ScuSendVBlankIN();
+	/* AUTOSAVE backup RAM: guardar 1seg despues de la ultima escritura */
+	{ extern u8 bup_ram_written; extern char bupfilename[]; extern int SaveBackupRam(const char*); static int _save_cd = 0;
+	  if (bup_ram_written) { bup_ram_written = 0; _save_cd = 60; }
+	  else if (_save_cd > 0) { if (--_save_cd == 0) { SaveBackupRam(bupfilename); } } }
 
    //if (yabsys.IsSSH2Running)
     //  SH2SendInterrupt(SSH2, 0x43, 0x6);

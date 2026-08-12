@@ -884,7 +884,7 @@ int LoadBackupRam(const char *filename)
 	}
 
 	//Read savefile
-	if (fread(&bup_savefile, 1, filesize, fp) <= sizeof(bup_header)) {
+	if (fread(bup_savefile, 1, filesize, fp) <= sizeof(bup_header)) {
 		fclose(fp);
 		return -1;
 	}
@@ -909,9 +909,8 @@ int SaveBackupRam(const char *filename)
 
 	//Get the last block used, if no data is written then do not save.
 	u32 last_block = BupLastUsedBlock() + 1;
-	if (last_block == 2) {
-		return -1;
-	}
+	if (0) { return -1; } /* no cortar - guardar siempre */
+	last_block = 256; /* forzar guardar toda la backup RAM (fix guardado roto) */
 
  	if ((fp = fopen(filename, "wb")) == NULL) {
 		return -1;
