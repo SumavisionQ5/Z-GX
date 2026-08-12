@@ -10,33 +10,29 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: devkitpro/devkitppc:latest
+      image: ghcr.io/extremscorner/libogc2:latest   # ← 关键：libogc2 专用镜像
       options: --user root
 
     env:
-      # 忽略 Node 20 弃用警告（可选）
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
 
     steps:
-      - name: 检出源码（不自动拉子模块，避免 .gitmodules 缺失报错）
+      - name: 检出源码（不自动拉子模块）
         uses: actions/checkout@v4
         with:
-          submodules: false        # ← 关键修改：之前是 recursive，现在改成 false
+          submodules: false
 
-      - name: 查看 .gitmodules 与 deps 目录（调试用）
+      - name: 查看 .gitmodules 与 deps 目录
         run: |
-          echo "=== .gitmodules 内容 ==="
           cat .gitmodules 2>/dev/null || echo "(没有 .gitmodules 文件)"
-          echo "=== deps 目录 ==="
           ls -la deps/ 2>/dev/null || echo "(deps 目录不存在)"
+          echo "=== 检查 libogc2 规则文件是否就位 ==="
+          ls -la /opt/devkitpro/libogc2/wii_rules
 
       - name: 清理异常的 gitlink 占位目录
         run: |
-          # deps/libchdr 在 .gitmodules 中没有 URL，无法作为子模块拉取。
-          # checkout 后它只是一个空占位目录，直接移除，避免干扰编译。
           rm -rf deps/libchdr
           echo "已清理 deps/libchdr"
-          ls -la deps/ 2>/dev/null || echo "(deps 目录已不存在)"
 
       - name: 安装可能缺失的编译依赖
         run: |
@@ -47,6 +43,7 @@ jobs:
 
       - name: 编译
         run: |
+          echo "开始编译..."
           make -j$(nproc)
 
       - name: 收集产物
