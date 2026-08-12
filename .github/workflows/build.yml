@@ -34,91 +34,58 @@ jobs:
         run: |
           export PATH="/opt/devkitpro/devkitPPC/bin:/opt/devkitpro/tools/bin:$PATH"
           dkp-pacman -Syu --noconfirm || true
-          # libpng 是官方包，libfat 包名叫 libfat-ogc
           dkp-pacman -S --needed --noconfirm \
             ppc-libpng libfat-ogc ppc-wiiuse ppc-bte \
             ppc-lzma ppc-zstd ppc-flac ppc-zlib || true
-          echo "=== 检查 png.h 是否就位 ==="
-          find /opt/devkitpro/portlibs -name "png.h" 2>/dev/null || true
 
       - name: 交叉编译并安装 libchdr（含 LZMA + miniz 依赖）
         run: |
           set -e
           export PATH="/opt/devkitpro/devkitPPC/bin:/opt/devkitpro/tools/bin:$PATH"
-
-          echo "=== 拉取 libchdr 源码 ==="
           git clone --depth=1 https://github.com/rtissera/libchdr deps/libchdr
           cd deps/libchdr
-
-          # 自动定位依赖目录（版本号可能变化）
           LZMA_DIR=$(find deps -maxdepth 1 -type d -name "lzma*" | head -1)
           MINIZ_DIR=$(find deps -maxdepth 1 -type d -name "miniz*" | head -1)
-          echo "LZMA 目录: $LZMA_DIR"
-          echo "MINIZ 目录: $MINIZ_DIR"
-
           COMMON="-O2 -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64"
           INCS="-Iinclude -I/opt/devkitpro/portlibs/ppc/include \
                 -I$LZMA_DIR/include -I$MINIZ_DIR"
-
-          echo "=== 编译 src/ ==="
           for f in src/*.c; do
-            echo "编译 $f"
             powerpc-eabi-gcc $COMMON $INCS -c "$f" -o "$(basename "$f" .c).o"
           done
-
-          echo "=== 编译 LZMA SDK（提供 CHDR_LzmaDec_* 符号）==="
-          # Z7_ST 宏是 LZMA SDK 必需的（见其 CMake 定义）
           for f in $LZMA_DIR/src/LzmaDec.c $LZMA_DIR/src/Alloc.c; do
             [ -f "$f" ] || continue
-            echo "编译 $f"
             powerpc-eabi-gcc $COMMON -DZ7_ST $INCS -c "$f" -o "$(basename "$f" .c).o"
           done
-
-          echo "=== 编译 miniz（提供 mz_inflate* 符号）==="
           powerpc-eabi-gcc $COMMON $INCS -c $MINIZ_DIR/miniz.c -o miniz.o
-
-          echo "=== 打包静态库 ==="
           powerpc-eabi-ar rcs libchdr.a *.o
-
-          echo "=== 安装到 portlibs ==="
           mkdir -p /opt/devkitpro/portlibs/ppc/include/libchdr
           cp include/libchdr/*.h /opt/devkitpro/portlibs/ppc/include/libchdr/
           cp libchdr.a /opt/devkitpro/portlibs/ppc/lib/
-          echo "=== 验证缺失符号已解决 ==="
-          powerpc-eabi-nm libchdr.a | grep -E "CHDR_LzmaDec_|mz_inflate" | head -20
           echo "✅ libchdr 安装完成"
 
       - name: 从 GRRLIB 源码交叉编译并安装 libpngu
         run: |
           set -e
           export PATH="/opt/devkitpro/devkitPPC/bin:/opt/devkitpro/tools/bin:$PATH"
-          echo "=== 拉取 GRRLIB（内含 libpngu 源码）==="
           git clone --depth=1 https://github.com/GRRLIB/GRRLIB /tmp/GRRLIB
-          # 自动定位 pngu.c 所在目录（一般是 GRRLIB/lib/pngu）
           PNGU_DIR=$(find /tmp/GRRLIB -name "pngu.c" -printf "%h\n" | head -1)
           echo "libpngu 源码目录: $PNGU_DIR"
           cd "$PNGU_DIR"
-
-          echo "=== 编译 libpngu ==="
           for f in *.c; do
-            echo "编译 $f"
             powerpc-eabi-gcc -O2 \
               -I/opt/devkitpro/portlibs/ppc/include \
               -I/opt/devkitpro/libogc2/wii/include \
               -c "$f" -o "$(basename "$f" .c).o"
           done
           powerpc-eabi-ar rcs libpngu.a *.o
-
-          echo "=== 安装到 portlibs ==="
           cp -v *.h /opt/devkitpro/portlibs/ppc/include/ 2>/dev/null || true
           cp -v libpngu.a /opt/devkitpro/portlibs/ppc/lib/
           echo "✅ libpngu 安装完成"
-          echo "=== 验证 ==="
-          ls -la /opt/devkitpro/portlibs/ppc/include/pngu.h /opt/devkitpro/portlibs/ppc/lib/libpngu.a
 
       - name: 编译 Z-GX
         run: |
           export PATH="/opt/devkitpro/devkitPPC/bin:/opt/devkitpro/tools/bin:$PATH"
+          mkdir -p SetaGX          # ← 关键：Makefile 需要这个目录来放 boot.dol
           make -j$(nproc)
 
       - name: 收集产物
@@ -127,6 +94,7 @@ jobs:
           cp -v *.dol *.elf dist/ 2>/dev/null || true
           cp -rv SetaGX dist/ 2>/dev/null || true
           cp -v README.md LICENSE* dist/ 2>/dev/null || true
+          echo "=== 最终产物 ==="
           find dist -type f | sort
 
       - name: 上传编译产物
