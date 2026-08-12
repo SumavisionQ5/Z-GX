@@ -1,58 +1,60 @@
 name: Build Z-GX
 
 on:
-  workflow_dispatch:          # 手动触发（Actions 页面点 Run workflow）
+  workflow_dispatch:
   push:
-    branches: [ master, main ] # 可选：push 时自动编译
+    branches: [ master, main ]
   pull_request:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: devkitpro/devkitppc:latest   # 官方 Wii 工具链镜像
+      image: devkitpro/devkitppc:latest
       options: --user root
 
+    env:
+      # 忽略 Node 20 弃用警告（可选）
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
+
     steps:
-      - name: 检出源码（包含子模块）
+      - name: 检出源码（不自动拉子模块，避免 .gitmodules 缺失报错）
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false        # ← 关键修改：之前是 recursive，现在改成 false
 
-      - name: 查看项目结构（调试用）
+      - name: 查看 .gitmodules 与 deps 目录（调试用）
         run: |
-          echo "=== 根目录 ==="
-          ls -la
-          echo "=== 查找 Makefile ==="
-          find . -maxdepth 3 -name "Makefile" -o -maxdepth 3 -name "makefile" | sort
+          echo "=== .gitmodules 内容 ==="
+          cat .gitmodules 2>/dev/null || echo "(没有 .gitmodules 文件)"
+          echo "=== deps 目录 ==="
+          ls -la deps/ 2>/dev/null || echo "(deps 目录不存在)"
+
+      - name: 清理异常的 gitlink 占位目录
+        run: |
+          # deps/libchdr 在 .gitmodules 中没有 URL，无法作为子模块拉取。
+          # checkout 后它只是一个空占位目录，直接移除，避免干扰编译。
+          rm -rf deps/libchdr
+          echo "已清理 deps/libchdr"
+          ls -la deps/ 2>/dev/null || echo "(deps 目录已不存在)"
 
       - name: 安装可能缺失的编译依赖
         run: |
-          echo "更新 devkitPro 软件源..."
           dkp-pacman -Syu --noconfirm || true
-          echo "尝试安装常见 ppc 库（若已存在则跳过）..."
           dkp-pacman -S --needed --noconfirm \
             ppc-libpng ppc-libpngu ppc-libfat ppc-wiiuse ppc-bte \
             ppc-libchdr ppc-lzma ppc-zstd || true
 
       - name: 编译
         run: |
-          echo "开始编译，使用 $(nproc) 个核心..."
           make -j$(nproc)
-          echo "✅ 编译完成"
 
       - name: 收集产物
-        id: collect
         run: |
           mkdir -p dist
-          echo "=== 收集所有生成文件 ==="
-          # 拷贝最终可执行文件
           cp -v *.dol *.elf dist/ 2>/dev/null || true
-          # 拷贝 Homebrew 目录（含 boot.dol）
           cp -rv SetaGX dist/ 2>/dev/null || true
-          # 拷贝说明文件（可选）
           cp -v README.md LICENSE* dist/ 2>/dev/null || true
-          echo "=== 最终产物列表 ==="
           find dist -type f | sort
 
       - name: 上传编译产物
