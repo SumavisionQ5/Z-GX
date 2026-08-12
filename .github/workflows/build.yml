@@ -15,7 +15,6 @@ jobs:
 
     env:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
-      # ↓↓↓ devkitPro 关键环境变量（显式声明，避免依赖镜像 profile）↓↓↓
       DEVKITPRO: /opt/devkitpro
       DEVKITPPC: /opt/devkitpro/devkitPPC
       PORTLIBS: /opt/devkitpro/portlibs/ppc
@@ -31,40 +30,62 @@ jobs:
           rm -rf deps/libchdr
           echo "已清理 deps/libchdr"
 
-      - name: 安装缺失的编译依赖
+      - name: 安装 devkitPro 官方依赖库
         run: |
+          export PATH="/opt/devkitpro/devkitPPC/bin:/opt/devkitpro/tools/bin:$PATH"
           dkp-pacman -Syu --noconfirm || true
+          # libpng 是官方包，libfat 包名叫 libfat-ogc
           dkp-pacman -S --needed --noconfirm \
-            ppc-libpng ppc-libpngu ppc-libfat ppc-wiiuse ppc-bte \
+            ppc-libpng libfat-ogc ppc-wiiuse ppc-bte \
             ppc-lzma ppc-zstd ppc-flac ppc-zlib || true
+          echo "=== 检查 png.h 是否就位 ==="
+          find /opt/devkitpro/portlibs -name "png.h" 2>/dev/null || true
 
-      - name: 交叉编译并安装 libchdr（CHD 解压库）
+      - name: 交叉编译并安装 libchdr
         run: |
           set -e
-          # ↓↓↓ 关键：把 devkitPPC 和 devkitPro 工具链加入 PATH ↓↓↓
           export PATH="/opt/devkitpro/devkitPPC/bin:/opt/devkitpro/tools/bin:$PATH"
-          echo "编译器路径: $(command -v powerpc-eabi-gcc)"
-
-          echo "=== 拉取 libchdr 源码 ==="
           git clone --depth=1 https://github.com/rtissera/libchdr deps/libchdr
           cd deps/libchdr
-
-          echo "=== 用 devkitPPC 编译所有源文件 ==="
           for f in src/*.c; do
             echo "编译 $f"
             powerpc-eabi-gcc -O2 -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 \
               -Iinclude -I/opt/devkitpro/portlibs/ppc/include \
               -c "$f" -o "$(basename "$f" .c).o"
           done
-
-          echo "=== 打包静态库 ==="
           powerpc-eabi-ar rcs libchdr.a *.o
-
-          echo "=== 安装到 portlibs ==="
           mkdir -p /opt/devkitpro/portlibs/ppc/include/libchdr
           cp include/libchdr/*.h /opt/devkitpro/portlibs/ppc/include/libchdr/
           cp libchdr.a /opt/devkitpro/portlibs/ppc/lib/
           echo "✅ libchdr 安装完成"
+
+      - name: 从 GRRLIB 源码交叉编译并安装 libpngu
+        run: |
+          set -e
+          export PATH="/opt/devkitpro/devkitPPC/bin:/opt/devkitpro/tools/bin:$PATH"
+          echo "=== 拉取 GRRLIB（内含 libpngu 源码）==="
+          git clone --depth=1 https://github.com/GRRLIB/GRRLIB /tmp/GRRLIB
+          # 自动定位 pngu.c 所在目录（一般是 GRRLIB/lib/pngu）
+          PNGU_DIR=$(find /tmp/GRRLIB -name "pngu.c" -printf "%h\n" | head -1)
+          echo "libpngu 源码目录: $PNGU_DIR"
+          cd "$PNGU_DIR"
+
+          echo "=== 编译 libpngu ==="
+          for f in *.c; do
+            echo "编译 $f"
+            powerpc-eabi-gcc -O2 \
+              -I/opt/devkitpro/portlibs/ppc/include \
+              -I/opt/devkitpro/libogc2/wii/include \
+              -c "$f" -o "$(basename "$f" .c).o"
+          done
+          powerpc-eabi-ar rcs libpngu.a *.o
+
+          echo "=== 安装到 portlibs ==="
+          cp -v *.h /opt/devkitpro/portlibs/ppc/include/ 2>/dev/null || true
+          cp -v libpngu.a /opt/devkitpro/portlibs/ppc/lib/
+          echo "✅ libpngu 安装完成"
+          echo "=== 验证 ==="
+          ls -la /opt/devkitpro/portlibs/ppc/include/pngu.h /opt/devkitpro/portlibs/ppc/lib/libpngu.a
 
       - name: 编译 Z-GX
         run: |
