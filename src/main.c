@@ -431,7 +431,7 @@ int main(int argc, char **argv)
 	//Autoload the gamefile
 	if (argc > 2) {
 		gui_value = GUI_RET_SELECT;
-		strcpy(isofilename, argv[1]);
+		if (argc > 2) { sprintf(isofilename, "%s/%s", argv[1], argv[2]); } else { strcpy(isofilename, argv[1]); } /* WiiFlow: argv1=device:/path, argv2=name */
 
 		if (isofilename[0] == 's' && fatMountSimple("sd", &__io_wiisd)) { // sd
 			device_path = "sd:/";
