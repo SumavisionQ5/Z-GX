@@ -15,6 +15,10 @@ jobs:
 
     env:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
+      # ↓↓↓ devkitPro 关键环境变量（显式声明，避免依赖镜像 profile）↓↓↓
+      DEVKITPRO: /opt/devkitpro
+      DEVKITPPC: /opt/devkitpro/devkitPPC
+      PORTLIBS: /opt/devkitpro/portlibs/ppc
 
     steps:
       - name: 检出源码（不自动拉子模块）
@@ -37,10 +41,13 @@ jobs:
       - name: 交叉编译并安装 libchdr（CHD 解压库）
         run: |
           set -e
+          # ↓↓↓ 关键：把 devkitPPC 和 devkitPro 工具链加入 PATH ↓↓↓
+          export PATH="/opt/devkitpro/devkitPPC/bin:/opt/devkitpro/tools/bin:$PATH"
+          echo "编译器路径: $(command -v powerpc-eabi-gcc)"
+
           echo "=== 拉取 libchdr 源码 ==="
           git clone --depth=1 https://github.com/rtissera/libchdr deps/libchdr
           cd deps/libchdr
-          ls src/ include/libchdr/
 
           echo "=== 用 devkitPPC 编译所有源文件 ==="
           for f in src/*.c; do
@@ -61,6 +68,7 @@ jobs:
 
       - name: 编译 Z-GX
         run: |
+          export PATH="/opt/devkitpro/devkitPPC/bin:/opt/devkitpro/tools/bin:$PATH"
           make -j$(nproc)
 
       - name: 收集产物
