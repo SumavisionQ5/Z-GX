@@ -10,7 +10,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/extremscorner/libogc2:latest   # ← 关键：libogc2 专用镜像
+      image: ghcr.io/extremscorner/libogc2:latest
       options: --user root
 
     env:
@@ -22,28 +22,45 @@ jobs:
         with:
           submodules: false
 
-      - name: 查看 .gitmodules 与 deps 目录
-        run: |
-          cat .gitmodules 2>/dev/null || echo "(没有 .gitmodules 文件)"
-          ls -la deps/ 2>/dev/null || echo "(deps 目录不存在)"
-          echo "=== 检查 libogc2 规则文件是否就位 ==="
-          ls -la /opt/devkitpro/libogc2/wii_rules
-
       - name: 清理异常的 gitlink 占位目录
         run: |
           rm -rf deps/libchdr
           echo "已清理 deps/libchdr"
 
-      - name: 安装可能缺失的编译依赖
+      - name: 安装缺失的编译依赖
         run: |
           dkp-pacman -Syu --noconfirm || true
           dkp-pacman -S --needed --noconfirm \
             ppc-libpng ppc-libpngu ppc-libfat ppc-wiiuse ppc-bte \
-            ppc-libchdr ppc-lzma ppc-zstd || true
+            ppc-lzma ppc-zstd ppc-flac ppc-zlib || true
 
-      - name: 编译
+      - name: 交叉编译并安装 libchdr（CHD 解压库）
         run: |
-          echo "开始编译..."
+          set -e
+          echo "=== 拉取 libchdr 源码 ==="
+          git clone --depth=1 https://github.com/rtissera/libchdr deps/libchdr
+          cd deps/libchdr
+          ls src/ include/libchdr/
+
+          echo "=== 用 devkitPPC 编译所有源文件 ==="
+          for f in src/*.c; do
+            echo "编译 $f"
+            powerpc-eabi-gcc -O2 -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 \
+              -Iinclude -I/opt/devkitpro/portlibs/ppc/include \
+              -c "$f" -o "$(basename "$f" .c).o"
+          done
+
+          echo "=== 打包静态库 ==="
+          powerpc-eabi-ar rcs libchdr.a *.o
+
+          echo "=== 安装到 portlibs ==="
+          mkdir -p /opt/devkitpro/portlibs/ppc/include/libchdr
+          cp include/libchdr/*.h /opt/devkitpro/portlibs/ppc/include/libchdr/
+          cp libchdr.a /opt/devkitpro/portlibs/ppc/lib/
+          echo "✅ libchdr 安装完成"
+
+      - name: 编译 Z-GX
+        run: |
           make -j$(nproc)
 
       - name: 收集产物
