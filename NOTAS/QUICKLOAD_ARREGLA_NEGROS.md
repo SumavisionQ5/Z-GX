@@ -58,3 +58,12 @@ las del Hi-Saturn 1.03 hacen que el HLE boot arranque bien estos juegos.
 
 Backup del bios en NOTAS/bios_backup/bios_QUE_FUNCIONA.bin (local, no en git por copyright).
 RECOMENDACION A USUARIOS: usar el BIOS Hi-Saturn 1.03 (RF) para maxima compatibilidad.
+
+=== PRECISION FINAL (confirmado por el usuario) ===
+BIOS ANTERIOR (que daba negros): Saturn Japan RF v1.00 (usado la ultima semana+).
+BIOS NUEVO (que los arregla): Hi-Saturn 1.03 (RF).
+=> El cambio Japan 1.00 -> Hi-Saturn 1.03 (con QuickLoad activo) fue lo que destrabo
+   los juegos. Confirmado: con el codigo limpio siguen funcionando.
+El Hi-Saturn 1.03 es un BIOS de la variante Hitachi del Saturn; sus tablas de arranque
+(copiadas por el QuickLoad/YabauseSpeedySetup) hacen arrancar bien muchos juegos que
+con el BIOS Japan estandar quedaban negros.
