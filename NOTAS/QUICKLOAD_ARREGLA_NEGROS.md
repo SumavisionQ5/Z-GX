@@ -44,3 +44,17 @@ arquitectural de sincronizacion master-slave (ver NOTAS_BUG_NEGRO.md).
 ## NOTA
 selectedcart quedo en 7 (original). El QuickLoad NO rompe juegos que ya andaban.
 Fallos graficos (Dynamite Deka, Sonic Jam) son tema aparte (VDP/capas), no el negro.
+
+=== CLAVE: ES LA COMBINACION BIOS + QUICKLOAD ===
+NO es solo el QuickLoad ni solo el BIOS. Es LA COMBINACION:
+- BIOS: GameNavi HiSaturn 1.03 (RF) [Hitachi Hi-Saturn v1.03 region-free]
+  MD5=7d5db9c27ea815003881df189f28382e SHA1=fb15bbea4a4a2542499352b292e7e0d96def40ec
+- QuickLoad activado (usequickload=1)
+
+Confirmado por el usuario: ya usaba este BIOS antes y Cotton NO funcionaba;
+el QuickLoad solo (ayer) tampoco alcanzaba. JUNTOS destraban los negros.
+Razon: el QuickLoad (YabauseSpeedySetup) copia las tablas de vectores del BIOS;
+las del Hi-Saturn 1.03 hacen que el HLE boot arranque bien estos juegos.
+
+Backup del bios en NOTAS/bios_backup/bios_QUE_FUNCIONA.bin (local, no en git por copyright).
+RECOMENDACION A USUARIOS: usar el BIOS Hi-Saturn 1.03 (RF) para maxima compatibilidad.
