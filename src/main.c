@@ -430,6 +430,7 @@ int main(int argc, char **argv)
 
 	//Autoload the gamefile
 	if (argc > 2) {
+	if (argc > 1) { char _ad[64]; sprintf(_ad, "%s/ZGX/argdebug.txt", (argv[1][0]==(char)0x75)?"usb:":"sd:"); FILE*_af=fopen(_ad,"wb"); if(_af){ fprintf(_af,"argc=%d\n", argc); for(int _i=0;_i<argc;_i++) fprintf(_af,"argv[%d]=[%s]\n", _i, argv[_i]); fclose(_af); } }
 		gui_value = GUI_RET_SELECT;
 		if (argc > 2) { sprintf(isofilename, "%s/%s", argv[1], argv[2]); } else { strcpy(isofilename, argv[1]); } /* WiiFlow: argv1=device:/path, argv2=name */
 

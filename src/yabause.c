@@ -216,7 +216,7 @@ int	YabauseInit(yabauseinit_struct *init)
 	YabauseResetNoLoad();
 
 	//NOTE: QuickLoad is disabled for now
-	yabsys.usequickload = 0;
+	yabsys.usequickload = 1;
 	if (yabsys.usequickload) {
 		if (YabauseQuickLoadGame() != 0) {
 			YabauseResetNoLoad();

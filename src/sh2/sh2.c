@@ -46,6 +46,7 @@ static void sh2_WDTExec(SH2 *sh, u32 cycles);
 void sh2_OnchipReset(SH2 *sh);
 
 
+void drc_ResetPages(void); //forward decl
 void sh2_Init(void)
 {
 	//Initialize the main sh2
@@ -55,6 +56,7 @@ void sh2_Init(void)
 	ssh2.on_chip[OC_BCR1+2] = 0x80;
 	//Init dynarec
 	sh2_DrcInit();
+	drc_ResetPages(); //FIX: limpiar invalidacion por paginas al cargar juego (evita cache stale/ISI en Batsugun etc)
 }
 
 void sh2_Deinit(void)
@@ -354,6 +356,13 @@ void drc_CheckWrite(u32 addr)
 			}
 		}
 	}
+}
+
+void drc_ResetPages(void)
+{
+	for (u32 i = 0; i < 2048; i++) { drc_code_pages[i] = 0; drc_page_heat[i] = 0; }
+	for (u32 i = 0; i < 16; i++) drc_dirty_pages[i] = 0;
+	drc_dirty_count = 0;
 }
 void sh2_WriteNotify(u32 start, u32 len)
 {
@@ -1078,8 +1087,7 @@ u16* sh2_GetPCAddr(u32 pc)
 			return (u16*) (bios_rom + (pc & (BIOS_SIZE - 1)));
 		case 0x002: // LWRAM
 			return (u16*) (wram + (pc & (LOW_WRAM_SIZE - 1)));
-		case 0x020: // CS0
-			return cs0_getPCAddr(pc);
+		case 0x020: return cs0_getPCAddr(pc);
 		case 0x060: // HWRAM
 		case 0x061:
 		case 0x062:
