@@ -1122,15 +1122,20 @@ void sh2_MSH2InputCaptureWrite16(u32 addr, u16 data)
 	if (OCR_TIER & 0x80) {
 		sh2_SetInterrupt(&msh2, (OCR_VCRC >> 8) & 0x7F, (OCR_IPRB >> 8) & 0xF);
 	}
-	// Ejecutar el master en el acto para procesar el ICF (simetrico al slave)
+	// Wake + sync tipo Kronos: si el master esta en SLEEP (0x001B) saltarlo, y
+	// sincronizar sus ciclos a los del SH2 que escribe (sh_ctx). Ver NOTAS_BUG_NEGRO.md
+	if (mem_Read16(msh2.pc & 0x0FFFFFFF) == 0x001B) msh2.pc += 2;
 	{
 		static int _ic_depth_m = 0;
-		if (_ic_depth_m < 4) {
-			_ic_depth_m++;
-			SH2 *_save = sh_ctx;
-			sh2_Exec(&msh2, 128);
-			sh_ctx = _save;
-			_ic_depth_m--;
+		if (_ic_depth_m < 4 && sh_ctx) {
+			int syncCycle = sh_ctx->cycles - msh2.cycles;
+			if (syncCycle > 0) {
+				_ic_depth_m++;
+				SH2 *_save = sh_ctx;
+				sh2_Exec(&msh2, syncCycle);
+				sh_ctx = _save;
+				_ic_depth_m--;
+			}
 		}
 	}
 }
@@ -1143,16 +1148,20 @@ void sh2_SSH2InputCaptureWrite16(u32 addr, u16 data)
 	if (OCR_TIER & 0x80) {
 		sh2_SetInterrupt(&ssh2, (OCR_VCRC >> 8) & 0x7F, (OCR_IPRB >> 8) & 0xF);
 	}
-	// Ejecutar el slave en el acto para que procese el ICF (patron Kronos)
-	// Ayuda a la sincronizacion master-slave. Ver NOTAS_BUG_NEGRO.md
+	// Wake + sync tipo Kronos: si el slave esta en SLEEP (0x001B) saltarlo, y
+	// sincronizar sus ciclos a los del SH2 que escribe (sh_ctx). Ver NOTAS_BUG_NEGRO.md
+	if (mem_Read16(ssh2.pc & 0x0FFFFFFF) == 0x001B) ssh2.pc += 2;
 	{
 		static int _ic_depth = 0;
-		if (_ic_depth < 4) {
-			_ic_depth++;
-			SH2 *_save = sh_ctx;
-			sh2_Exec(&ssh2, 128);
-			sh_ctx = _save;
-			_ic_depth--;
+		if (_ic_depth < 4 && sh_ctx) {
+			int syncCycle = sh_ctx->cycles - ssh2.cycles;
+			if (syncCycle > 0) {
+				_ic_depth++;
+				SH2 *_save = sh_ctx;
+				sh2_Exec(&ssh2, syncCycle);
+				sh_ctx = _save;
+				_ic_depth--;
+			}
 		}
 	}
 }
