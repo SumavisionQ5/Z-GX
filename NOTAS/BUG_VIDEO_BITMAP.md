@@ -81,3 +81,11 @@ FALTA SOLO COLOR: sale rosa/azul plano (deberia color real). RGB565 toma 2 de lo
 4 bytes del pixel 32bpp -> pierde componentes. Ajustar orden/lectura de bytes de color.
 REFERENCIA futura: PicoDrive (RetroArch Wii) corre 32X 60fps con dynarec SH2 - util
 para dynarec SH2 y timing FMV (NO para video Saturn, hardware distinto).
+
+=== EXPERIMENTO CD TIMING (descartado) ===
+Probado bajar _periodictiming 2x de 20000 a 15000: el video va MAS RAPIDO pero con
+los MISMOS tirones. Conclusion: el jitter NO es la velocidad de lectura del CD.
+El problema es la REGULARIDAD de la presentacion de frames (pipeline de video/bitmap),
+no el streaming del CD. Descartado el CD timing. Revertido a 20000.
+Proxima vez: investigar el pipeline de presentacion del bitmap (SGX_Vdp2DrawBitmap)
+y como se sincroniza la actualizacion del frame de video con el VBlank.
