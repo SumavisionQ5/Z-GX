@@ -1122,6 +1122,17 @@ void sh2_MSH2InputCaptureWrite16(u32 addr, u16 data)
 	if (OCR_TIER & 0x80) {
 		sh2_SetInterrupt(&msh2, (OCR_VCRC >> 8) & 0x7F, (OCR_IPRB >> 8) & 0xF);
 	}
+	// Ejecutar el master en el acto para procesar el ICF (simetrico al slave)
+	{
+		static int _ic_depth_m = 0;
+		if (_ic_depth_m < 4) {
+			_ic_depth_m++;
+			SH2 *_save = sh_ctx;
+			sh2_Exec(&msh2, 128);
+			sh_ctx = _save;
+			_ic_depth_m--;
+		}
+	}
 }
 
 void sh2_SSH2InputCaptureWrite16(u32 addr, u16 data)
