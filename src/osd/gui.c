@@ -31,7 +31,7 @@ extern u8 menu_tex_4bpp_data[];
 
 
 static u32 cursor_longname = 0;
-static s32 cursor_idle = 128;
+static s32 cursor_idle = 20;
 static f32 cursor_time = 128.0f;
 static f32 cursor_inc = 2.0f;
 static String gui_msg;
@@ -241,7 +241,7 @@ static void gui_DrawItems(GuiItems *items, u32 width, u32 height)
 	}
 
 	if(!cursor_longname) {
-		cursor_idle = 128;
+		cursor_idle = 20;
 	} else {
 		--cursor_idle;
 	}
@@ -283,7 +283,7 @@ static void gui_DrawItems(GuiItems *items, u32 width, u32 height)
 		u32 num = i + items->disp_offset;
 		u32 padding = 0;
 		if (items->cursor == num && cursor_idle < 0) {
-			padding = cursor_idle >> 3;
+			padding = cursor_idle >> 1;
 		}
 		x += padding;
 		gui_DrawString(x, y, 1024, items->item[num]);
@@ -353,7 +353,7 @@ static void __gui_LoadBoxart(String *str)
 		if (!boxart_data) return;
 	}
 	char path[512];
-	snprintf(path, sizeof(path), "sd:/ZGX/art/%s.png", name);
+	extern char g_device_path[16]; snprintf(path, sizeof(path), "%sZGX/art/%s.png", g_device_path, name);
 	IMGCTX ctx = PNGU_SelectImageFromDevice(path);
 	if (!ctx) return;
 	PNGUPROP prop;

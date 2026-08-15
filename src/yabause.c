@@ -71,6 +71,7 @@ u32 snd_muted = 0; //toggle de sonido en vivo
 u32 drc_inval_count = 0; //invalidaciones de cache por frame (debug)
 u32 drc_flush_count = 0; //HashClearAll por buffer lleno
 u32 drc_comp_count = 0; //bloques compilados
+u32 drc_idle_count = 0; //idle loops detectados (bloques que saltan a si mismos)
 char bupfilename[512];
 u64 tickfreq;
 

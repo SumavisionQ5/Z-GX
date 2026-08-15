@@ -1,0 +1,62 @@
+/* c68k_core.c - Wrapper para usar C68K con la interfaz musashi_* que espera scsp.c
+   Reemplaza al core Musashi (mas lento) por C68K (mas rapido) sin tocar scsp.c. */
+
+#include "../core.h"
+#include "../m68kcore.h"
+#include "c68k/c68k.h"
+
+static M68K_READ  *zg_read8;
+static M68K_READ  *zg_read16;
+static M68K_WRITE *zg_write8;
+static M68K_WRITE *zg_write16;
+
+static uint32_t FASTCALL c68k_r8(const uint32_t adr)  { return zg_read8(adr); }
+static uint32_t FASTCALL c68k_r16(const uint32_t adr) { return zg_read16(adr); }
+static void FASTCALL c68k_w8(const uint32_t adr, uint32_t data)  { zg_write8(adr, data); }
+static void FASTCALL c68k_w16(const uint32_t adr, uint32_t data) { zg_write16(adr, data); }
+
+int musashi_Init(void)
+{
+	C68k_Init(&C68K, NULL);
+	C68k_Set_ReadB(&C68K, c68k_r8);
+	C68k_Set_ReadW(&C68K, c68k_r16);
+	C68k_Set_WriteB(&C68K, c68k_w8);
+	C68k_Set_WriteW(&C68K, c68k_w16);
+	return 0;
+}
+
+void musashi_DeInit(void) { }
+
+void musashi_Reset(void) { C68k_Reset(&C68K); }
+
+s32 musashi_Exec(s32 cycles) { return C68k_Exec(&C68K, cycles); }
+
+void musashi_Sync(void) { }
+
+u32 musashi_GetDReg(u32 n) { return C68k_Get_DReg(&C68K, n); }
+u32 musashi_GetAReg(u32 n) { return C68k_Get_AReg(&C68K, n); }
+u32 musashi_GetPC(void)    { return C68k_Get_PC(&C68K); }
+u32 musashi_GetSR(void)    { return C68k_Get_SR(&C68K); }
+u32 musashi_GetUSP(void)   { return C68k_Get_USP(&C68K); }
+u32 musashi_GetMSP(void)   { return C68k_Get_MSP(&C68K); }
+
+void musashi_SetDReg(u32 n, u32 val) { C68k_Set_DReg(&C68K, n, val); }
+void musashi_SetAReg(u32 n, u32 val) { C68k_Set_AReg(&C68K, n, val); }
+void musashi_SetPC(u32 val)  { C68k_Set_PC(&C68K, val); }
+void musashi_SetSR(u32 val)  { C68k_Set_SR(&C68K, val); }
+void musashi_SetUSP(u32 val) { C68k_Set_USP(&C68K, val); }
+void musashi_SetMSP(u32 val) { C68k_Set_MSP(&C68K, val); }
+
+void musashi_SetFetch(u32 low_adr, u32 high_adr, pointer fetch_addr)
+{
+	C68k_Set_Fetch(&C68K, low_adr, high_adr, (uintptr_t)fetch_addr);
+}
+
+void FASTCALL musashi_SetIRQ(s32 level) { C68k_Set_IRQ(&C68K, level); }
+
+void FASTCALL musashi_WriteNotify(u32 address, u32 size) { }
+
+void musashi_SetReadB(M68K_READ *func)  { zg_read8  = func; }
+void musashi_SetReadW(M68K_READ *func)  { zg_read16 = func; }
+void musashi_SetWriteB(M68K_WRITE *func){ zg_write8  = func; }
+void musashi_SetWriteW(M68K_WRITE *func){ zg_write16 = func; }

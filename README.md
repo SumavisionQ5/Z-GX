@@ -32,6 +32,7 @@ BIOS NO INCLUIDO: coloca tu BIOS en sd:/ZGX/bios/bios.bin (recomendado region-li
 ## Creditos
 
 - CheloRetro - Fork Z-GX
+- NiuuS - Logo de Z-GX, pruebas y administracion del proyecto
 - Evoca (fadedled) - Seta GX, base de este fork
 - Yabause Team - Codigo fuente original
 - devmiyax - Yaba Sanshiro

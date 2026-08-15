@@ -214,7 +214,7 @@ void SGX_Vdp1Begin(void)
 	//NOTE: Necesary?
 	GX_SetZMode(GX_ENABLE, GX_ALWAYS, GX_DISABLE);
 	GX_SetZTexture(GX_ZT_DISABLE, GX_TF_Z8, 0);
-	GX_SetScissor(usr_clipx, usr_clipy, usr_clipw, usr_cliph);
+	GX_SetScissor(0, 0, 640, 480);
 	GX_SetLineWidth(6, 0);
 
 	//Store format
@@ -583,13 +583,13 @@ static void __SGX_Vdp1SetConstantPart(u32 is_rgb)
 			//TODO: Wrong, this should be done in a better way.
 			GX_SetScissor(0, 0, usr_clipy, sys_clipx);
 		} else {
-			GX_SetScissor(usr_clipx, usr_clipy, usr_clipw, usr_cliph);
+			GX_SetScissor(0, 0, 640, 480);
 		}
 	} else {
-		GX_SetScissor(0, 0, sys_clipx, sys_clipy);
+		GX_SetScissor(0, 0, 640, 480);
 	}
 	//Set mesh processing
-	GX_SetZMode((vdp1cmd->PMOD >> 8) & 0x1, GX_GREATER, GX_DISABLE);
+	GX_SetZMode(GX_FALSE, GX_ALWAYS, GX_DISABLE);
 }
 
 static u32 __SGX_Vdp1SetMode(u32 w, u32 h)
@@ -991,7 +991,7 @@ void SGX_Vdp1SysClip(void)
 	//TODO: should clamp value.
 	usr_clipx = vdp1cmd->XC + 1;
 	sys_clipy = vdp1cmd->YC + 1;
-	GX_SetScissor(0, 0, sys_clipx, sys_clipy);
+	GX_SetScissor(0, 0, 640, 480);
 }
 
 void SGX_Vdp1LocalCoord(void)

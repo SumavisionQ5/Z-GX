@@ -36,12 +36,18 @@ void *gp_fifo;
 u8 *fb_scale_tex ATTRIBUTE_ALIGN(32);		/*Texture for scaling x axis fb*/
 
 
+void SVI_ClearXFB(void)
+{
+	u32 xfb_size = 704 * 512 * VI_DISPLAY_PIX_SZ;
+	if (xfb[0]) __VIClearFramebuffer(xfb[0], xfb_size, COLOR_BLACK);
+	if (xfb[1]) __VIClearFramebuffer(xfb[1], xfb_size, COLOR_BLACK);
+}
 void SVI_Init(void)
 {
 	VIDEO_Init();
 	rmode = VIDEO_GetPreferredMode(NULL);
 	{ //240p opcional para CRT: si existe el archivo, forzar modo single-field
-		FILE *_f240 = fopen("sd:/ZGX/240p.txt", "rb");
+		extern char g_device_path[16]; char _p240path[32]; sprintf(_p240path, "%sZGX/240p.txt", g_device_path); FILE *_f240 = fopen(_p240path, "rb");
 		if (_f240) {
 			fclose(_f240);
 			if (rmode == &TVNtsc480IntDf || rmode == &TVNtsc480Int || rmode == &TVNtsc480Prog) {

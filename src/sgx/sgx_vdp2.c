@@ -51,6 +51,8 @@ u32 vdp1_fb_mtx = MTX_TEX_SCALED_N;				/*framebuffer scaling in vdp2*/
 u32 vdp2_disp_w = SS_DISP_WIDTH;	/*display width*/
 u32 vdp2_disp_h = SS_DISP_HEIGHT;	/*display height*/
 u32 screen_enable = 0;			/*Enable bits per screen (Uses the PRI_ marcros for bit access)*/
+u32 _skip_layer = 0; /* 0=nada 1=skipNBG0 2=skipNBG1 3=skipNBG2 */
+u32 chctla_dbg = 0, cfmt_dbg = 0, bmsz_dbg = 0, bmw_dbg = 0, bmconv_dbg = 0;
 
 static struct CellFormatData {
 	u32 disp_ctl;	/*Screen display Control*/
@@ -76,6 +78,7 @@ static struct CellFormatData {
 	u32 xmap_shft;		/*map bit shift for x axis*/
 	u32 ymap_shft;		/*map bit shift for y axis*/
 	u8 *map_addr[16]; 	/* addresses of maps*/
+	u8 *bmp_addr;		/* bitmap base address */
 } cell;
 
 
@@ -268,6 +271,7 @@ static void __Vdp2ReadNBG(u32 bg_id)
 			u32 map_offset = ((((u32)Vdp2Regs->MPOFN) >> 0) & 0x7) << 6;
 			cell.pri = ((Vdp2Regs->PRINA & 0x7) << 4) | PRI_NGB0;
 			cell.map_addr[0] = Vdp2Ram + (((map_offset | (((Vdp2Regs->MPABN0 >> 0) & 0x3F) & ~cell.plane_mask)) << map_shft) & 0x7FF00);
+	cell.bmp_addr = Vdp2Ram + ((((u32)Vdp2Regs->MPOFN & 0x7) << 17) & 0x7FFFF);
 			cell.map_addr[1] = Vdp2Ram + (((map_offset | (((Vdp2Regs->MPABN0 >> 8) & 0x3F) & ~cell.plane_mask)) << map_shft) & 0x7FF00);
 			cell.map_addr[2] = Vdp2Ram + (((map_offset | (((Vdp2Regs->MPCDN0 >> 0) & 0x3F) & ~cell.plane_mask)) << map_shft) & 0x7FF00);
 			cell.map_addr[3] = Vdp2Ram + (((map_offset | (((Vdp2Regs->MPCDN0 >> 8) & 0x3F) & ~cell.plane_mask)) << map_shft) & 0x7FF00);
@@ -287,6 +291,7 @@ static void __Vdp2ReadNBG(u32 bg_id)
 			u32 map_offset = ((((u32)Vdp2Regs->MPOFN) >> 4) & 0x7) << 6;
 			cell.pri = (((Vdp2Regs->PRINA >> 8) & 0x7) << 4) | PRI_NGB1;
 			cell.map_addr[0] = Vdp2Ram + (((map_offset | (((Vdp2Regs->MPABN1 >> 0) & 0x3F) & ~cell.plane_mask)) << map_shft) & 0x7FF00);
+	cell.bmp_addr = Vdp2Ram + (((((u32)Vdp2Regs->MPOFN >> 4) & 0x7) << 17) & 0x7FFFF);
 			cell.map_addr[1] = Vdp2Ram + (((map_offset | (((Vdp2Regs->MPABN1 >> 8) & 0x3F) & ~cell.plane_mask)) << map_shft) & 0x7FF00);
 			cell.map_addr[2] = Vdp2Ram + (((map_offset | (((Vdp2Regs->MPCDN1 >> 0) & 0x3F) & ~cell.plane_mask)) << map_shft) & 0x7FF00);
 			cell.map_addr[3] = Vdp2Ram + (((map_offset | (((Vdp2Regs->MPCDN1 >> 8) & 0x3F) & ~cell.plane_mask)) << map_shft) & 0x7FF00);
@@ -346,23 +351,69 @@ static void SGX_Vdp2DrawCell(void)
 {
 
 }
-
+static void SGX_BeginVdp2BitmapRect(u32 fmt, u32 w, u32 h)
+{
+	u32 tmem_even = 0x8C000000 | 0x100000 | 0x20000;
+	u32 tmem_odd = 0x90000000;
+	u32 tex_filt = 0x8000000A;
+	u32 tex_lod = 0x84000000;
+	u32 tex_maddr = 0x94000000;
+	u32 tex_size = 0x88000000 | (fmt << 20) | (((h-1) & 0x3FFu) << 10) | ((w-1) & 0x3FFu);
+	GX_LOAD_BP_REG(tex_filt);
+	GX_LOAD_BP_REG(tex_lod);
+	GX_LOAD_BP_REG(tex_size);
+	GX_LOAD_BP_REG(tmem_even);
+	GX_LOAD_BP_REG(tmem_odd);
+	GX_LOAD_BP_REG(tex_maddr);
+}
 static void SGX_Vdp2DrawBitmap(void)
 {
-
+	u32 bmsz = (cell.char_ctl >> 2) & 0x3;
+	cfmt_dbg = cell.color_fmt; bmsz_dbg = bmsz;
+	u32 bm_width = (bmsz & 0x2) ? 1024 : 512;
+	if (cell.color_fmt == 4) bm_width <<= 1;
+	u32 bm_height = (bmsz & 0x1) ? 512 : 256;
+	u32 w = bm_width >> 3;
+	bmw_dbg = bm_width; bmconv_dbg = w;
+	u32 fmt; u32 bpp_id; u32 use_tlut = 0;
+	switch (cell.color_fmt) {
+		case 0: fmt = GX_TF_CI4;  bpp_id = SPRITE_4BPP;  use_tlut = 1; break;
+		case 1: fmt = GX_TF_CI8;  bpp_id = SPRITE_8BPP;  use_tlut = 1; break;
+		case 2: fmt = GX_TF_CI14; bpp_id = SPRITE_16BPP; use_tlut = 1; break;
+		case 3: fmt = GX_TF_RGB5A3; bpp_id = SPRITE_16BPP; break;
+		case 4: fmt = GX_TF_RGB5A3; bpp_id = SPRITE_16BPP; break;
+	}
+	GX_SetVtxDesc(GX_VA_POS, GX_DIRECT);
+	GX_SetVtxDesc(GX_VA_TEX0, GX_NONE);
+	GX_SetTexCoordGen(GX_TEXCOORD0, GX_TG_MTX2x4, GX_TG_POS, MTX_TEX_FLIP_N);
+	GX_SetTexCoordScaleManually(GX_TEXCOORD0, GX_TRUE, bm_width, bm_height);
+	vdp2mtx[0][0] = (f32) ((cell.color_fmt == 4) ? (bm_width >> 1) : bm_width); vdp2mtx[0][1] = 0.0f; vdp2mtx[0][2] = 0.0f; vdp2mtx[0][3] = 0.0f;
+	vdp2mtx[1][0] = 0.0f; vdp2mtx[1][1] = (f32) vdp2_disp_h; vdp2mtx[1][2] = 0.0f; vdp2mtx[1][3] = 0.0f;
+	vdp2mtx[2][0] = 0.0f; vdp2mtx[2][1] = 0.0f; vdp2mtx[2][2] = 1.0f; vdp2mtx[2][3] = 0.0f;
+	GX_LoadPosMtxImm(vdp2mtx, MTX_VDP1_POS_2D);
+	GX_SetCurrentMtx(MTX_VDP1_POS_2D);
+	SGX_SetTex(cell.bmp_addr, fmt, bm_width, bm_height, 0);
+	SGX_SpriteConverterSet(w, bpp_id, 0);
+	if (use_tlut) {
+		u32 pal = ((cell.ptrn_supp) >> 16) & 0x7F;
+		u8 *cram_tlut;
+		if (cell.color_fmt == 0) cram_tlut = (cell.disp_ctl & 0x100 ? cram_11bpp : cram_4bpp);
+		else if (cell.color_fmt == 1) cram_tlut = (cell.disp_ctl & 0x100 ? cram_11bpp : cram_8bpp);
+		else cram_tlut = cram_11bpp;
+		SGX_LoadTlut(cram_tlut, TLUT_SIZE_2K | TLUT_INDX_CRAM0);
+		u32 tlut_addr = 0x98000000 | TLUT_FMT_RGB5A3 | TLUT_INDX_CRAM0 | pal;
+		GX_LOAD_BP_REG(tlut_addr);
+	}
+	GX_Begin(GX_TRIANGLESTRIP, GX_VTXFMT1, 4);
+		GX_Position2s16(0, 0);
+		GX_Position2s16(1, 0);
+		GX_Position2s16(0, 1);
+		GX_Position2s16(1, 1);
+	GX_End();
+	GX_SetVtxDesc(GX_VA_TEX0, GX_DIRECT);
+	GX_SetTexCoordGen(GX_TEXCOORD0, GX_TG_MTX2x4, GX_TG_TEX0, MTX_IDENTITY);
+	GX_SetCurrentMtx(MTX_IDENTITY);
 }
-
-/*Draws a simple Cell background:
- * All char color count. []
- * All char sizes []
- * All Ptrn Name data size [x]
- * All plane sizes [x]
- * 4 plane count [x]
- * No arbitrary scale function
- * Mosaic function []
- * No line scroll
- * No vertical cell scroll function
- */
 static void SGX_Vdp2DrawCellSimple(void)
 {
 	guMtxIdentity(vdp2mtx);
@@ -621,7 +672,7 @@ void SGX_Vdp2GenCRAM(void) {
 //Begins the Vdp1 Drawing Process
 void SGX_Vdp2Draw(void)
 {
-	GX_SetScissor(0, 0, vdp2_disp_w, vdp2_disp_h);
+	GX_SetScissor(0, 0, vdp2_disp_w, vdp2_disp_h); chctla_dbg = Vdp2Regs->CHCTLA;
 	//Check for enabled screens
 	u32 scr_pri = 0;
 	u32 scr_enable = 0;
@@ -685,12 +736,12 @@ void SGX_Vdp2Draw(void)
 		SGX_Vdp2DrawCellSimple();
 	}
 
-	if (screen_enable & (1 << PRI_NGB2)) {
+	if ((screen_enable & (1 << PRI_NGB2)) && _skip_layer != 3) {
 		__Vdp2ReadNBG(2);	//Draw NBG2
 		SGX_Vdp2DrawCellSimple();
 	}
 
-	if (screen_enable & (1 << PRI_NGB1)) {
+	if ((screen_enable & (1 << PRI_NGB1)) && _skip_layer != 2) {
 		__Vdp2ReadNBG(1);	//Draw NBG1
 		if (cell.char_ctl & 0x2) {
 			SGX_Vdp2DrawBitmap();
@@ -699,7 +750,7 @@ void SGX_Vdp2Draw(void)
 		}
 	}
 
-	if (screen_enable & (1 << PRI_NGB0)) {
+	if ((screen_enable & (1 << PRI_NGB0)) && _skip_layer != 1) {
 		__Vdp2ReadNBG(0);	//Draw NBG0
 		if (cell.char_ctl & 0x2) {
 			SGX_Vdp2DrawBitmap();

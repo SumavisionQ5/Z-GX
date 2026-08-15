@@ -163,6 +163,7 @@ void TexCopy_LoRes(u32 w, u32 h);
 static s32 selected = 0, start = 0;
 int cart_enabled = 0; //toggle cartucho RAM 4MB desde el menu (Z)
 int p240_pref = 0; //preferencia 240p (refleja si existe 240p.txt)
+char g_device_path[16] = "sd:/"; //ruta del dispositivo activo (sd:/ o usb:/), para 240p y covers
 static s32 selectedcart = 7;
 static int bioswith = 0;
 static int frameskipoff = 0;
@@ -297,7 +298,7 @@ u32 menu_Handle(void)
 	per_updatePads();
 	buttons = PER_BUTTONS_DOWN(0);
 	{ static u32 _cpv=0; u32 _cn=((PER_BUTTONS_HELD(0)&(PAD_DI_L|PAD_DI_R))==(PAD_DI_L|PAD_DI_R)); if(_cn && !_cpv) cart_enabled^=1; _cpv=_cn; } //TOGGLE cart 4MB con L+R
-	{ static u32 _ppv=0; u32 _pn=((PER_BUTTONS_HELD(0)&(PAD_DI_L|PAD_DI_Y))==(PAD_DI_L|PAD_DI_Y)); if(_pn && !_ppv) { p240_pref^=1; if(p240_pref){ FILE*_pf=fopen("sd:/ZGX/240p.txt","wb"); if(_pf)fclose(_pf); } else { remove("sd:/ZGX/240p.txt"); } } _ppv=_pn; } //TOGGLE 240p con L+Y
+	{ static u32 _ppv=0; u32 _pn=((PER_BUTTONS_HELD(0)&(PAD_DI_Z|PAD_DI_Y))==(PAD_DI_Z|PAD_DI_Y)); if(_pn && !_ppv) { char _p2p[32]; sprintf(_p2p, "%sZGX/240p.txt", g_device_path); p240_pref^=1; if(p240_pref){ FILE*_pf=fopen(_p2p,"wb"); if(_pf)fclose(_pf); } else { remove(_p2p); } } _ppv=_pn; } //TOGGLE 240p con Z+Y (usa g_device_path)
 	{
 		u32 held = PER_BUTTONS_HELD(0);
 		static int hold_frames = 0;
@@ -430,7 +431,7 @@ int main(int argc, char **argv)
 	//Autoload the gamefile
 	if (argc > 2) {
 		gui_value = GUI_RET_SELECT;
-		strcpy(isofilename, argv[1]);
+		if (argc > 2) { sprintf(isofilename, "%s/%s", argv[1], argv[2]); } else { strcpy(isofilename, argv[1]); } /* WiiFlow: argv1=device:/path, argv2=name */
 
 		if (isofilename[0] == 's' && fatMountSimple("sd", &__io_wiisd)) { // sd
 			device_path = "sd:/";
@@ -446,10 +447,11 @@ int main(int argc, char **argv)
 		} else {
 			//Device not found notice
 		}
+		if (device_path) strcpy(g_device_path, device_path); //guardar ruta del dispositivo para 240p/covers
 		//Only load gamelist
 		sprintf(games_dir, "%s%s", device_path, "ZGX/games");
 		games_LoadList();
-	{ FILE *_p2f = fopen("sd:/ZGX/240p.txt", "rb"); if (_p2f) { p240_pref = 1; fclose(_p2f); } } //sincronizar indicador 240p con el archivo
+	{ char _p2r[32]; sprintf(_p2r, "%sZGX/240p.txt", g_device_path); FILE *_p2f = fopen(_p2r, "rb"); if (_p2f) { p240_pref = 1; fclose(_p2f); } } //sincronizar indicador 240p (usa g_device_path)
 	}
 
 	//Copy the routes
@@ -566,6 +568,7 @@ int CoreExec()
 
 	VIDEO_SetBlack(1);
 	SVI_SetResolution(0x00D2);
+		SVI_ClearXFB(); //limpiar XFB al cargar cada juego (evita basura del anterior al encadenar)
 	VIDEO_WaitVSync();
 
 	if ((ret = YabauseInit(&yinit)) == 0) {

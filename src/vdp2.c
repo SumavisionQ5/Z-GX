@@ -33,6 +33,7 @@
 #include "sgx/sgx.h"
 #include "sgx/svi.h"
 
+u32 _prof_on = 0;
 u8 * Vdp2Ram;
 u8 * Vdp2ColorRam;
 
@@ -281,6 +282,10 @@ void Vdp2VBlankIN(void) {
    //VidSoftVdp2DrawEnd();
    Vdp2Regs->TVSTAT |= 0x0008;
    ScuSendVBlankIN();
+	/* AUTOSAVE backup RAM: guardar 1seg despues de la ultima escritura */
+	{ extern u8 bup_ram_written; extern char bupfilename[]; extern int SaveBackupRam(const char*); static int _save_cd = 0;
+	  if (bup_ram_written) { bup_ram_written = 0; _save_cd = 60; }
+	  else if (_save_cd > 0) { if (--_save_cd == 0) { SaveBackupRam(bupfilename); } } }
 
    //if (yabsys.IsSSH2Running)
     //  SH2SendInterrupt(SSH2, 0x43, 0x6);
@@ -320,7 +325,7 @@ static void FPSDisplay(void)
 	static int fpsframecount = 0;
 	static u64 fpsticks;
 	osd_FPSDraw(fps);
-	{ extern u32 drc_inval_count; static char _ib[32]; extern void osd_MsgAdd(u32,u32,u32,char*); }
+	{ }
 	{ extern u32 snd_muted; if (snd_muted) osd_MsgAdd(10, 30, 0xFF4040FF, "SND OFF"); }
 	fpsframecount++;
 
@@ -371,7 +376,7 @@ void Vdp2VBlankOUT(void)
 	if (1) { // FPS siempre activo
 		FPSDisplay();
 	}
-	//if (yabsys.flags & SYS_FLAGS_SHOW_FPS) osd_ProfDraw(); // overlay VDP quitado
+	{ extern u32 _prof_on; if (_prof_on) osd_ProfDraw(); } // overlay abajo, toggle R+Z
 	SGX_Vdp1SwapFramebuffer();
 	SVI_SwapBuffers(0);
 
