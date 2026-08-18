@@ -54,7 +54,7 @@ MACHDEP = -DGEKKO -mrvl -mcpu=750 -meabi -mhard-float -fsigned-char -ffast-math 
 
 #This is only for profiling with gperf
 MACHDEP += #-fomit-frame-pointer
-CFLAGS	= -g -O2 -Wall -static -falign-functions=2 $(MACHDEP) $(DDEFINES) $(VDEFINES) $(INCLUDE)
+CFLAGS	= -g -O2 -Wall -static -falign-functions=2 -std=gnu99 $(MACHDEP) $(DDEFINES) $(VDEFINES) $(INCLUDE)
 #CFLAGS =  $(DDEFINES) -g -Ofast -mrvl -Wall $(MACHDEP) -$(INDLUDE)
 CXXFLAGS	=	$(CFLAGS)
 
