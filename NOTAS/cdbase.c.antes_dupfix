@@ -313,14 +313,13 @@ static int charToEscape(char *buffer) {
 
 #ifndef WIN32
 static FILE* fopenInPath(char* filename, char* path){
-  int k;
-  int l = strlen(filename) + 2;
-  DIR *d = opendir(path);
-  struct dirent *ent;
+  int nbFiles,i,k;
   char* tmp;
-  if (!d) return NULL;
-  while ((ent = readdir(d)) != NULL) {
-    if (strncasecmp(filename, ent->d_name, l) == 0) {
+  int l = strlen(filename) + 2;
+  struct dirent **fileListTemp;
+  nbFiles = scandir(path, &fileListTemp, NULL, alphasort);
+  for(i = 0; i < nbFiles; i++){
+    if (strncasecmp(filename, fileListTemp[i]->d_name, l) == 0) {
       int p= (l + charToEscape(filename) + charToEscape(path)+strlen(path));
       char* filepath = malloc(p*sizeof(char));
       tmp = filepath;
@@ -329,17 +328,16 @@ static FILE* fopenInPath(char* filename, char* path){
            *tmp++ = path[k];
       }
       *tmp++ = '/';
-      for (k=0; k<strlen(ent->d_name); k++) {
-        if (shallBeEscaped(ent->d_name[k])) *tmp++='\\';
-           *tmp++ = ent->d_name[k];
+      for (k=0; k<strlen(fileListTemp[i]->d_name); k++) {
+        if (shallBeEscaped(fileListTemp[i]->d_name[k])) *tmp++='\\';
+           *tmp++ = fileListTemp[i]->d_name[k];
       }
       *tmp++ = '\0';
-      closedir(d);
       return fopen(filepath,"rb");
     }
   }
-  closedir(d);
   return NULL;
+
 }
 #else
 static FILE* fopenInPath(char* filename, char* path){
@@ -1157,6 +1155,13 @@ static void ISOCDReadAheadFAD(UNUSED u32 FAD)
 #define CD_MAX_TRACKS           (99)    /* AFAIK the theoretical limit */
 #define CD_TRACK_PADDING 4
 
+typedef struct ChdInfo_ {
+  chd_file *chd;
+  core_file * image_file;
+  const chd_header * header;
+  char * hunk_buffer;
+  int current_hunk_id;
+} ChdInfo;
 
 ChdInfo * pChdInfo = NULL;
 

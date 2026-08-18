@@ -54,7 +54,7 @@ MACHDEP = -DGEKKO -mrvl -mcpu=750 -meabi -mhard-float -fsigned-char -ffast-math 
 
 #This is only for profiling with gperf
 MACHDEP += #-fomit-frame-pointer
-CFLAGS	= -g -O2 -Wall -static -falign-functions=2 -std=gnu99 -fno-strict-aliasing -fwrapv -fno-aggressive-loop-optimizations $(MACHDEP) $(DDEFINES) $(VDEFINES) $(INCLUDE)
+CFLAGS	= -g -O2 -Wall -static -falign-functions=2 $(MACHDEP) $(DDEFINES) $(VDEFINES) $(INCLUDE)
 #CFLAGS =  $(DDEFINES) -g -Ofast -mrvl -Wall $(MACHDEP) -$(INDLUDE)
 CXXFLAGS	=	$(CFLAGS)
 
@@ -70,7 +70,6 @@ LIBS	:= -lpngu -lpng16 -laesnd -lfat -lwiiuse -lbte -logc -lchdr -llzma -lzstd -
 # list of directories containing libraries, this must be the top level containing
 # include and lib
 #---------------------------------------------------------------------------------
-PORTLIBS := $(DEVKITPRO)/portlibs/ppc $(DEVKITPRO)/portlibs/wii
 LIBDIRS	:= $(PORTLIBS)
 
 #---------------------------------------------------------------------------------

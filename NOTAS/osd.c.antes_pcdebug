@@ -259,7 +259,7 @@ void osd_ProfDraw(void)
 	__osd_DrawText(x, y, tstr, numc);
 	y += 8;
 	{ extern u32 drc_comp_count, drc_inval_count, drc_flush_count, drc_idle_count;
-	   numc = sprintf(tstr, "IDLE:%u C:%u", drc_idle_count, drc_comp_count);
+          numc = sprintf(tstr, "IDLE:%u C:%u", drc_idle_count, drc_comp_count);
 	  __osd_DrawText(x, y, tstr, numc);
 	  drc_comp_count=0; drc_inval_count=0; drc_flush_count=0; drc_idle_count=0; }
 	{ extern u32 cfmt_dbg, bmw_dbg, bmconv_dbg, vdp2_disp_w, screen_enable; 
