@@ -1073,33 +1073,6 @@ void sh2_Write32(u32 addr, u32 val)
 }
 
 
-// ===== BIOS HLE: handler de funciones del BIOS (semaforos, backup RAM) =====
-int bios_HandleFunc(void)
-{
-	SH2 *sh = sh_ctx;
-	u32 idx = (sh->pc - 0x06000200) >> 2;
-	switch (idx) {
-		case 0x4C: { // 0x06000330 BiosGetSemaphore
-			u8 temp = sh2_Read8(0x06000B00 + sh->r[4]);
-			sh->r[0] = (temp == 0) ? 1 : 0;
-			sh2_Write8(0x06000B00 + sh->r[4], temp | 0x80);
-			sh->cycles += 11; sh->pc = sh->pr; return 1;
-		}
-		case 0x4D: { // 0x06000334 BiosClearSemaphore
-			sh2_Write8(0x06000B00 + sh->r[4], 0);
-			sh->cycles += 5; sh->pc = sh->pr; return 1;
-		}
-		case 0x56: { // 0x06000358 BiosBUPInit
-			u32 r5 = sh->r[5];
-			sh2_Write32(0x06000354, r5);
-			int k; for (k = 0; k < 0x2C; k += 4)
-				sh2_Write32(r5 + k, 0x00000380 + k);
-			sh->pc = sh->pr; return 1;
-		}
-	}
-	sh->pc = sh->pr; return 0;
-}
-
 u16* sh2_GetPCAddr(u32 pc)
 {
 	//Debug

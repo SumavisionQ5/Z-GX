@@ -1432,24 +1432,6 @@ u32* _jit_GenBlock(u32* iblock, u32 addr)
 	}
 
 	u32 *icache_ptr = &drc_code[drc_code_pos];
-
-	// ===== BIOS HLE: interceptar saltos a la zona de funciones del BIOS =====
-	// Si el PC entra en 0x06000200-0x060003FF, generar un bloque que llame al
-	// handler C (bios_HandleFunc) en vez de compilar el codigo (que no existe).
-	if ((addr & 0xFFFFFF00) == 0x06000300 || (addr & 0xFFFFFF00) == 0x06000200) {
-		extern int bios_HandleFunc(void);
-		PPCC_BL(bios_HandleFunc);        // llamar al handler (usa sh_ctx)
-		PPCC_ADDI(3, 0, 11);             // devolver ~11 ciclos
-		PPCC_B(jit_endblock_test);       // volver al dispatcher
-		*iblock = (u32) &drc_code[drc_code_pos];
-		s32 blen = ((u8*) icache_ptr - (u8*)*iblock);
-		u32 bpos = ((u32) *iblock) & ~0x1F;
-		DCStoreRange((void*) bpos, blen + 0x20);
-		ICInvalidateRange((void*) bpos, blen + 0x20);
-		drc_code_pos += blen >> 2;
-		drc_blocks_size++;
-		return iblock;
-	}
 	//u32 *iblock_arr = iblock;
 
 	u32 reg_count = 1;
