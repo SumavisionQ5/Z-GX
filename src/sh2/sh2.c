@@ -33,6 +33,7 @@ SH2 msh2;
 SH2 ssh2;
 
 SH2 *sh_ctx;
+u32 _hle_calls=0, _hle_idx=0, _hle_pc=0, _hle_maxidx=0;
 
 #define write8(ptr, x)		(*((u8*)(ptr)) = (x))
 #define write16(ptr, x)		(*((u16*)(ptr)) = (x))
@@ -169,6 +170,7 @@ void sh2_Exec(SH2 *sh, u32 cycles)
 {
 	//Update context
 	sh_ctx = sh;
+	if (sh == &msh2) { extern void zgx_track_master(u32); zgx_track_master(sh->pc); extern u32 _m_prev, _m_beforeerr; if((sh->pc & 0xFFFFFFF0)==0x06000670){ if(_m_beforeerr==0)_m_beforeerr=_m_prev; } else _m_prev=sh->pc; }
 	//if (!(sh->flags & SH2_FLAG_SLEEPING)) {
 	sh2_DrcExec(sh, cycles);
 	cycles += sh->cycles;
@@ -205,6 +207,7 @@ void sh2_SetInterrupt(SH2 *sh, u32 vec, u32 level)
 	sh->iqr_count++;
 }
 
+u32 _m_irqproc=0;
 void sh2_HandleInterrupt(SH2 *sh)
 {
 	if (sh->iqr_count) {
@@ -217,7 +220,7 @@ void sh2_HandleInterrupt(SH2 *sh)
 			sh->sr = SH2_SR_SET_I(sh->sr, level);
 			sh->pc = sh2_Read32(sh->vbr + (vec << 2));
 			--sh->iqr_count;
-			SH2_FLAG_CLR(sh, SH2_FLAG_IDLE | SH2_FLAG_SLEEPING);
+			SH2_FLAG_CLR(sh, SH2_FLAG_IDLE | SH2_FLAG_SLEEPING); if(sh==&msh2)_m_irqproc++;
 		}
 	}
 }
@@ -1074,10 +1077,32 @@ void sh2_Write32(u32 addr, u32 val)
 
 
 // ===== BIOS HLE: handler de funciones del BIOS (semaforos, backup RAM) =====
+// Handler completo de instruccion ilegal (para el dynarec en modo HLE).
+// Chequea si el PC es una funcion del BIOS (bios_HandleFunc). Si la maneja, listo.
+// Si no, hace el exception estandar (push SR y PC, salta al vector).
+void sh2_IllegalFull(u32 pc)
+{
+	SH2 *sh = sh_ctx;
+	extern int zgx_hle_bios;
+	sh->pc = pc;
+	// Modo HLE: chequear si es una funcion del BIOS
+	if (zgx_hle_bios && pc >= 0x200 && pc <= 0x4FF) {
+		extern int bios_HandleFunc(void);
+		if (bios_HandleFunc()) return; // manejada, PC ya ajustado
+	}
+	// Exception estandar de instruccion ilegal (vector 4)
+	sh2_Write32(sh->r[15] - 4, sh->sr);
+	sh2_Write32(sh->r[15] - 8, pc + 2);
+	sh->r[15] -= 8;
+	sh->pc = sh2_Read32(sh->vbr + (4 << 2));
+}
+
+u32 scumasklist[0x20], sh2masklist[0x20];
 int bios_HandleFunc(void)
 {
 	SH2 *sh = sh_ctx;
-	u32 idx = (sh->pc - 0x06000200) >> 2;
+	u32 idx = (sh->pc - 0x200) >> 2; // indice como yabasanshiro
+	{ extern u32 _hle_calls, _hle_idx, _hle_pc; _hle_calls++; _hle_idx = idx; _hle_pc = sh->pc; if(idx > _hle_maxidx) _hle_maxidx = idx; }
 	switch (idx) {
 		case 0x4C: { // 0x06000330 BiosGetSemaphore
 			u8 temp = sh2_Read8(0x06000B00 + sh->r[4]);
@@ -1095,6 +1120,100 @@ int bios_HandleFunc(void)
 			int k; for (k = 0; k < 0x2C; k += 4)
 				sh2_Write32(r5 + k, 0x00000380 + k);
 			sh->pc = sh->pr; return 1;
+		}
+		case 0x04: { // 0x06000210 PowerOnMemoryClear (stub: no-op)
+			sh->pc = sh->pr; return 1;
+		}
+		case 0x20: { // 0x06000280 ChangeScuInterruptPriority
+			int i;
+			for (i = 0; i < 0x20; i++) {
+				scumasklist[i] = sh2_Read32(sh->r[4] + (i << 2));
+				sh2masklist[i] = (scumasklist[i] >> 16);
+				if (scumasklist[i] & 0x8000) scumasklist[i] |= 0xFFFF0000;
+				else scumasklist[i] &= 0x0000FFFF;
+			}
+			sh->cycles += 186; sh->pc = sh->pr; return 1;
+		}
+		case 0x40: { // 0x06000300 SetScuInterrupt
+			if (sh->r[5] == 0) { sh2_Write32(0x06000900 + (sh->r[4] << 2), 0x06000610); sh->cycles += 8; }
+			else { sh2_Write32(0x06000900 + (sh->r[4] << 2), sh->r[5]); sh->cycles += 9; }
+			sh->pc = sh->pr; return 1;
+		}
+		case 0x44: { // 0x06000310 SetSh2Interrupt
+			if (sh->r[5] == 0) { sh2_Write32(sh->vbr + (sh->r[4] << 2), 0x06000600); sh->cycles += 8; }
+			else { sh2_Write32(sh->vbr + (sh->r[4] << 2), sh->r[5]); sh->cycles += 9; }
+			sh->pc = sh->pr; return 1;
+		}
+		case 0x48: { // 0x06000320 ChangeSystemClock (stub)
+			sh->pc = sh->pr; return 1;
+		}
+		case 0x50: { // 0x06000340 SetScuInterruptMask
+			if (sh_ctx != &ssh2) {
+				sh2_Write32(0x06000348, sh->r[4]);
+				sh2_Write32(0x25FE00A0, sh->r[4]);
+				sh2_Write32(0x25FE00A4, sh->r[4]);
+			}
+			if (!(sh->r[4] & 0x8000)) sh2_Write32(0x25FE00A8, 1);
+			sh->cycles += 17; sh->pc = sh->pr; return 1;
+		}
+		case 0x51: { // 0x06000344 ChangeScuInterruptMask (stub-ish, igual que SetMask)
+			if (sh_ctx != &ssh2) {
+				sh2_Write32(0x06000348, sh->r[4]);
+				sh2_Write32(0x25FE00A0, sh->r[4]);
+			}
+			if (!(sh->r[4] & 0x8000)) sh2_Write32(0x25FE00A8, 1);
+			sh->cycles += 17; sh->pc = sh->pr; return 1;
+		}
+		case 0x27: case 0x37: { // CDINIT2/CDINIT1 (stub)
+			sh->pc = sh->pr; return 1;
+		}
+		case 0x80: case 0x81: case 0x82: case 0x83:
+		case 0x84: case 0x85: case 0x86: case 0x87:
+		case 0x88: case 0x89: case 0x8A: case 0x8B:
+		case 0x8C: case 0x8D: case 0x90: case 0x91:
+		case 0x92: case 0x93: case 0x94: case 0x95:
+		case 0x96: case 0x97: case 0x98: case 0x99:
+		case 0x9A: case 0x9B: case 0x9C: case 0x9D:
+		case 0x9E: case 0x9F: { // BiosHandleScuInterrupt
+			int vector = (sh->pc - 0x300) >> 2;
+			sh->r[15] -= 4; sh2_Write32(sh->r[15], sh->r[0]);
+			sh->r[15] -= 4; sh2_Write32(sh->r[15], sh->r[1]);
+			sh->r[15] -= 4; sh2_Write32(sh->r[15], sh->r[2]);
+			sh->r[15] -= 4; sh2_Write32(sh->r[15], sh->r[3]);
+			sh->r[15] -= 4; sh2_Write32(sh->r[15], sh2_Read32(0x06000348));
+			sh->r[15] -= 4; sh2_Write32(sh->r[15], sh->r[4]);
+			sh->r[15] -= 4; sh2_Write32(sh->r[15], sh->r[5]);
+			sh->r[15] -= 4; sh2_Write32(sh->r[15], sh->r[6]);
+			sh->r[15] -= 4; sh2_Write32(sh->r[15], sh->r[7]);
+			sh->r[15] -= 4; sh2_Write32(sh->r[15], sh->pr);
+			sh->r[15] -= 4; sh2_Write32(sh->r[15], sh->gbr);
+			sh->sr = (u32) sh2masklist[vector - 0x40];
+			sh2_Write32(0x06000348, sh2_Read32(0x06000348) | scumasklist[vector - 0x40]);
+			sh2_Write32(0x25FE00A0, sh2_Read32(0x06000348) | scumasklist[vector - 0x40]);
+			sh->pr = 0x00000480;
+			sh->pc = sh2_Read32(0x06000900 + (vector << 2));
+			sh->cycles += 200; return 1;
+		}
+		case 0xA0: { // BiosHandleScuInterruptReturn
+			u32 oldmask;
+			sh->gbr = sh2_Read32(sh->r[15]); sh->r[15] += 4;
+			sh->pr = sh2_Read32(sh->r[15]); sh->r[15] += 4;
+			sh->r[7] = sh2_Read32(sh->r[15]); sh->r[15] += 4;
+			sh->r[6] = sh2_Read32(sh->r[15]); sh->r[15] += 4;
+			sh->r[5] = sh2_Read32(sh->r[15]); sh->r[15] += 4;
+			sh->r[4] = sh2_Read32(sh->r[15]); sh->r[15] += 4;
+			sh->sr = 0xF0;
+			oldmask = sh2_Read32(sh->r[15]);
+			sh2_Write32(0x06000348, oldmask);
+			sh2_Write32(0x25FE00A0, oldmask);
+			sh->r[15] += 4;
+			sh->r[3] = sh2_Read32(sh->r[15]); sh->r[15] += 4;
+			sh->r[2] = sh2_Read32(sh->r[15]); sh->r[15] += 4;
+			sh->r[1] = sh2_Read32(sh->r[15]); sh->r[15] += 4;
+			sh->r[0] = sh2_Read32(sh->r[15]); sh->r[15] += 4;
+			sh->pc = sh2_Read32(sh->r[15]); sh->r[15] += 4;
+			sh->sr = sh2_Read32(sh->r[15]) & 0x000003F3; sh->r[15] += 4;
+			sh->cycles += 200; return 1;
 		}
 	}
 	sh->pc = sh->pr; return 0;
@@ -1227,3 +1346,12 @@ void __WriteSH2(void) {
 		__CloseSH2Writer();
 	}
 }
+unsigned zgx_spc2(void) { return (unsigned) ssh2.pc; }
+unsigned zgx_scyc(void) { return (unsigned) ssh2.cycles; }
+unsigned zgx_mpc2(void) { return (unsigned) msh2.pc; }
+unsigned zgx_slcode(void) { return (unsigned) mem_Read32(0x20000200); }
+u32 _m_gamemax = 0, _m_prev = 0, _m_beforeerr = 0;
+void zgx_track_master(u32 pc) {
+	if (pc >= 0x06002000 && pc < 0x06100000 && pc > _m_gamemax) _m_gamemax = pc;
+}
+unsigned zgx_mgamemax(void) { return _m_gamemax; }

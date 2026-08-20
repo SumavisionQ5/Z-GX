@@ -691,7 +691,7 @@ void YabauseSpeedySetup(void)
 {
    u32 data;
    int i;
-	{ // siempre copiar BIOS real (base del hibrido)
+	if (zgx_hle_bios) { bios_Init(); } else {
 
 	// Setup the vector table area, etc.(all bioses have it at 0x00000600-0x00000810)
 	for (i = 0; i < 0x210; i+=4)
@@ -742,7 +742,7 @@ void YabauseSpeedySetup(void)
 	// Fix SCU interrupts
 	for (i = 0; i < 0x80; i+=4)
 		mem_Write32(0x06000A00+i, 0x0600083C);
-	} if (zgx_hle_bios) { bios_Init(); } // hibrido: BIOS real + tabla de intercepcion HLE
+	} // fin BIOS real
 
    // Set the cpu's, etc. to sane states
 

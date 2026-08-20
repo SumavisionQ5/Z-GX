@@ -10,7 +10,6 @@
 #include <stdio.h>
 
 
-extern void sh2_IllegalFull(u32 pc);
 extern void jit_exit();
 extern void jit_export_regs();
 extern void jit_endblock_test();
@@ -1119,11 +1118,21 @@ extern void sh2_int_MACW(SH2 *sh, u32 inst);
 	PPCC_MOV(rn, GP_TMP); 	/*Store shifted Rm in Rn*/
 	//XXX: Maybe could be done in two instructions.
 
-#define SH2JIT_ILLEGAL		/* Illegal instruction handler (HLE-aware) */ \
-	PPCC_ADDIS(3, 0, curr_pc >> 16);		/*Load curr_pc immediate -> r3*/ \
-	PPCC_ORI(3, 3, curr_pc);			\
-	PPCC_BL(sh2_IllegalFull);			/*sh2_IllegalFull(curr_pc)*/ \
-	PPCE_LOAD(GP_PC, pc);				/*Recargar PC del contexto*/
+#define SH2JIT_ILLEGAL		/* Illegal instruciton handler */ \
+	u32 vector = (4 + ((ifc_array[i] & IFC_ILGL_BRANCH) >> 8)) << 2;	/*4 if only illegal 6 if branch value*/	\
+	PPCC_ADDI(3, GP_R(15), -4);			/*R15 - 4 -> address*/ \
+	PPCC_MOV(4, GP_SR);					/*SR -> value*/ \
+	PPCC_BL(sh2_Write32);				/*Write 32bit value*/ \
+	PPCC_ADDI(3, GP_R(15), -8);			/*R15 - 8 -> address*/ \
+	PPCC_ADDIS(4, 0, (curr_pc+2) >> 16);	/*Load PC+2 immediate -> value*/ \
+	PPCC_ORI(4, 4, curr_pc+2);		 	\
+	PPCC_BL(sh2_Write32);				/*Write 32 bit value*/ \
+	PPCC_ADDI(GP_R(15), GP_R(15), -8);	/*R15 - 8 -> address*/ \
+	PPCE_LOAD(3, vbr);				 \
+	PPCC_ADDI(3, 3, vector);		/* VBR + dispimm -> address*/ \
+	PPCC_BL(sh2_Read32);				/*Read addr*/ \
+	/* PPCC_MOV(GP_PC, 3); */			/*Result -> PC*/ \
+	PPCE_SAVE(3, pc);				/* Save PC */ \
 
 
 
