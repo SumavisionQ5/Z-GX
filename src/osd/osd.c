@@ -259,7 +259,7 @@ void osd_ProfDraw(void)
 	__osd_DrawText(x, y, tstr, numc);
 	y += 8;
 	{ extern u32 drc_comp_count, drc_inval_count, drc_flush_count, drc_idle_count;
-	   { extern unsigned zgx_mpc2(void); extern u32 zgx_spc2(void); extern unsigned zgx_slcode(void); numc = sprintf(tstr, "MPC:%08X", zgx_mpc2()); __osd_DrawText(x, y, tstr, numc); y += 8; numc = sprintf(tstr, "BEF:%08X GM:%08X", ({extern u32 _m_beforeerr; _m_beforeerr;}), ({extern unsigned zgx_mgamemax(void); zgx_mgamemax();})); }
+	   { extern unsigned zgx_mpc2(void); extern u32 zgx_spc2(void); extern unsigned zgx_slcode(void); numc = sprintf(tstr, "MPC:%08X", zgx_mpc2()); __osd_DrawText(x, y, tstr, numc); y += 8; numc = sprintf(tstr, "R6:%08X FROM:%08X", ({extern u32 _m_r6; _m_r6;}), ({extern u32 _m_from2b0; _m_from2b0;})); }
 	  __osd_DrawText(x, y, tstr, numc);
 	  drc_comp_count=0; drc_inval_count=0; drc_flush_count=0; drc_idle_count=0; }
 	{ extern u32 cfmt_dbg, bmw_dbg, bmconv_dbg, vdp2_disp_w, screen_enable; 

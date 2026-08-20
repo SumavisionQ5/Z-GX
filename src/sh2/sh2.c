@@ -170,7 +170,7 @@ void sh2_Exec(SH2 *sh, u32 cycles)
 {
 	//Update context
 	sh_ctx = sh;
-	if (sh == &msh2) { extern void zgx_track_master(u32); zgx_track_master(sh->pc); extern u32 _m_prev, _m_beforeerr; if((sh->pc & 0xFFFFFFF0)==0x06000670){ if(_m_beforeerr==0)_m_beforeerr=_m_prev; } else _m_prev=sh->pc; }
+	if (sh == &msh2) { extern void zgx_track_master(u32); zgx_track_master(sh->pc); extern u32 _m_prev, _m_beforeerr, _m_after2b0; if(_m_prev>=0x000002A0 && _m_prev<=0x000002BF && (sh->pc<0x2A0 || sh->pc>0x2BF)){ if(_m_after2b0==0){_m_after2b0=sh->pc;} } if((sh->pc & 0xFFFFFFF0)==0x06000670){ if(_m_beforeerr==0)_m_beforeerr=_m_prev; } _m_prev=sh->pc; if(sh->pc==0x000002B0 || sh->pc==0x000002C4){ extern u32 _m_r6, _m_r0at2ac; _m_r6=sh->r[6]; } if(sh->pc==0x000002B0){ extern u32 _m_from2b0; if(_m_from2b0==0)_m_from2b0=_m_prev; } }
 	//if (!(sh->flags & SH2_FLAG_SLEEPING)) {
 	sh2_DrcExec(sh, cycles);
 	cycles += sh->cycles;
@@ -1350,7 +1350,7 @@ unsigned zgx_spc2(void) { return (unsigned) ssh2.pc; }
 unsigned zgx_scyc(void) { return (unsigned) ssh2.cycles; }
 unsigned zgx_mpc2(void) { return (unsigned) msh2.pc; }
 unsigned zgx_slcode(void) { return (unsigned) mem_Read32(0x20000200); }
-u32 _m_gamemax = 0, _m_prev = 0, _m_beforeerr = 0;
+u32 _m_gamemax = 0, _m_prev = 0, _m_beforeerr = 0, _m_after2b0 = 0, _m_r6 = 0, _m_from2b0 = 0;
 void zgx_track_master(u32 pc) {
 	if (pc >= 0x06002000 && pc < 0x06100000 && pc > _m_gamemax) _m_gamemax = pc;
 }
