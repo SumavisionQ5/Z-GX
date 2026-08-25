@@ -15,3 +15,10 @@ cp seta-gx.dol /e/apps/ZGX/boot.dol
 ## la libogc2 actual (dan relocation truncated / ABI incompatible).
 
 ## El .dol correcto pesa ~1.7MB. Se carga desde /e/apps/ZGX/boot.dol
+
+## COPIAR EL DOL A LOS 2 LUGARES (obligatorio):
+cp seta-gx.dol /e/apps/ZGX/boot.dol
+cp seta-gx.dol "/e/wiiflow/plugins/Sega Saturn/ZGX.dol"
+## (o usar: ./copiar_dol.sh)
+## apps/ZGX = carga directa (Homebrew Channel)
+## wiiflow/plugins/Sega Saturn = carga desde WiiFlow

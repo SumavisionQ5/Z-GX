@@ -427,23 +427,19 @@ int main(int argc, char **argv)
 
 
 	usleep(500000);
+
 	//Autoload the gamefile
-	if (argc > 1) {
-		// 1) Montar el dispositivo PRIMERO (antes de escribir cualquier archivo)
-		if ((argv[1][0]=='u' || argv[1][0]=='U') && fatMountSimple("usb", &__io_usbstorage)) {
-			device_path = "usb:/";
-		} else if (fatMountSimple("sd", &__io_wiisd)) {
+	if (argc > 2) {
+	if (argc > 1) { char _ad[64]; sprintf(_ad, "%s/ZGX/argdebug.txt", (argv[1][0]==(char)0x75)?"usb:":"sd:"); FILE*_af=fopen(_ad,"wb"); if(_af){ fprintf(_af,"argc=%d\n", argc); for(int _i=0;_i<argc;_i++) fprintf(_af,"argv[%d]=[%s]\n", _i, argv[_i]); fclose(_af); } }
+		gui_value = GUI_RET_SELECT;
+		if (argc > 2) { sprintf(isofilename, "%s/%s", argv[1], argv[2]); } else { strcpy(isofilename, argv[1]); } /* WiiFlow: argv1=device:/path, argv2=name */
+
+		if (isofilename[0] == 's' && fatMountSimple("sd", &__io_wiisd)) { // sd
 			device_path = "sd:/";
+			//XXX: Check if this is correct
 		} else if (fatMountSimple("usb", &__io_usbstorage)) {
 			device_path = "usb:/";
 		}
-		if (!device_path) device_path = "sd:/"; // fallback
-		strcpy(g_device_path, device_path);
-		// 3) Armar el path del juego
-		gui_value = GUI_RET_SELECT;
-		if (argc > 2) { sprintf(isofilename, "%s/%s", argv[1], argv[2]); } else { strcpy(isofilename, argv[1]); }
-		// 4) Preferencia 240p
-		{ char _p2r[48]; sprintf(_p2r, "%sZGX/240p.txt", g_device_path); FILE *_p2f = fopen(_p2r, "rb"); if (_p2f) { p240_pref = 1; fclose(_p2f); } }
 	} else {
 		if(fatMountSimple("sd", &__io_wiisd)) {
 			device_path = "sd:/";
@@ -512,11 +508,7 @@ int main(int argc, char **argv)
 	osd_ProfAddCounter(PROF_VDP1, "VDP1");
 	osd_ProfAddCounter(PROF_VDP2, "VDP2");
 	osd_ProfAddCounter(PROF_CDB, "CDB");
-	// Solo rearmar isofilename desde la lista si NO venimos de autoboot/WiiFlow (argc<=1).
-	// Si venimos de WiiFlow (argc>1), isofilename ya tiene el path correcto del juego.
-	if (argc <= 1) {
-		sprintf(isofilename, "%s/%s", games_dir, filename_items.item[filename_items.cursor].data);
-	}
+	sprintf(isofilename, "%s/%s", games_dir, filename_items.item[filename_items.cursor].data);
 
 	while(1) {
 		if (gui_value == GUI_RET_SELECT) {
