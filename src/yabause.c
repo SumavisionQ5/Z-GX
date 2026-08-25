@@ -686,7 +686,7 @@ void bios_Init(void)
 	mem_Write32(0x0600064c, 0x06000400);
 }
 
-int zgx_hle_bios = 1; // 1 = HLE (bios_Init), 0 = BIOS real (copiar). Probar VC2 en HLE.
+int zgx_hle_bios = 0; // 1 = HLE (bios_Init), 0 = BIOS real (copiar). Probar VC2 en HLE.
 void YabauseSpeedySetup(void)
 {
    u32 data;
