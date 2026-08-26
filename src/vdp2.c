@@ -373,7 +373,8 @@ void Vdp2VBlankOUT(void)
 		Vdp1NoDraw();	//Do nothing
 		SVI_ClearFrame();
 	}
-	if (1) { // FPS siempre activo
+	extern int opt_fps;
+	if (opt_fps) { // FPS controlado por el menu de opciones
 		FPSDisplay();
 	}
 	{ extern u32 _prof_on; if (_prof_on) osd_ProfDraw(); } // overlay abajo, toggle R+Z
