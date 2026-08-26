@@ -245,6 +245,7 @@ void SVI_CopyFrame(void)
 			GX_Position2s16(0, h);
 			GX_Position2s16(w, h);
 			GX_End();
+		{ extern void overlay_Draw(u32,u32); overlay_Draw(w, h); } // scanline sobre el frame escalado
 
 			GX_SetDispCopySrc(0, 0, w, h);
 			GX_SetDispCopyDst(704, h);
