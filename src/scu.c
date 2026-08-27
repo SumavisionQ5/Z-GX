@@ -2330,3 +2330,5 @@ void ScuSendDrawEnd(void) {
 void ScuSendExternalInterrupt00(void) {
    SendInterrupt(0x50, 0x7, 0x8000, 0x00010000);
 }
+unsigned zgx_scuims(void) { return ScuRegs ? (unsigned)ScuRegs->IMS : 0xDEAD; }
+unsigned zgx_scuist(void) { return ScuRegs ? (unsigned)ScuRegs->IST : 0xDEAD; }

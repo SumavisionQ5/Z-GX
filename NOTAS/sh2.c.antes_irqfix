@@ -211,7 +211,7 @@ void sh2_HandleInterrupt(SH2 *sh)
 {
 	if (sh->iqr_count) {
 		u32 level = SH2_INTERRUPT_LEVEL(sh->iqr[sh->iqr_count-1]);
-		if (level > SH2_SR_I(sh->sr) || level >= 15) { /* nivel 15 (max) se acepta aunque iguale la mascara */
+		if (level > SH2_SR_I(sh->sr)) {
 			u32 vec = SH2_INTERRUPT_VEC(sh->iqr[sh->iqr_count-1]);
 			sh2_Write32(sh->r[15] - 4, sh->sr);
 			sh2_Write32(sh->r[15] - 8, sh->pc);
@@ -929,7 +929,7 @@ u8 sh2_Read8(u32 addr)
 		if (sh_ctx->flags & SH2_FLAG_SLAVE) {
 			static u32 _last_addr = 0; static u32 _same_count = 0;
 			if (addr == _last_addr) {
-				if (++_same_count >= 8 && sh_ctx->cycles < 0) { sh_ctx->cycles = 0; _same_count = 0; }
+				if (++_same_count >= 64 && sh_ctx->cycles < 0) { sh_ctx->cycles = 0; _same_count = 0; }
 			} else { _last_addr = addr; _same_count = 0; }
 		}
 		return wram[(addr | ((addr >> 6) & 0x100000)) & 0x1FFFFF];
@@ -1359,8 +1359,6 @@ void __WriteSH2(void) {
 unsigned zgx_msr(void) { return (unsigned) msh2.sr; }
 unsigned zgx_ssr(void) { return (unsigned) ssh2.sr; }
 unsigned zgx_miqr(void) { return (unsigned) msh2.iqr_count; }
-unsigned zgx_miqrlvl(void) { extern u32 SH2_INTERRUPT_LEVEL_fn(u32); if (msh2.iqr_count==0) return 0xFF; return (unsigned)((msh2.iqr[msh2.iqr_count-1] >> 8) & 0x1F); }
-unsigned zgx_miqrvec(void) { if (msh2.iqr_count==0) return 0xFF; return (unsigned)(msh2.iqr[msh2.iqr_count-1] & 0xFF); }
 unsigned zgx_spc2(void) { return (unsigned) ssh2.pc; }
 unsigned zgx_scyc(void) { return (unsigned) ssh2.cycles; }
 unsigned zgx_mpc2(void) { return (unsigned) msh2.pc; }
@@ -1386,8 +1384,3 @@ void zgx_track_master(u32 pc) {
 	if (pc >= 0x06002000 && pc < 0x06100000 && pc > _m_gamemax) _m_gamemax = pc;
 }
 unsigned zgx_mgamemax(void) { return _m_gamemax; }
-unsigned zgx_mirqproc(void) { extern u32 _m_irqproc; return _m_irqproc; }
-unsigned zgx_mA(void) { return (unsigned) mem_Read16((msh2.pc & 0x0FFFFFFF) - 10); }
-unsigned zgx_mC(void) { return (unsigned) mem_Read16((msh2.pc & 0x0FFFFFFF) - 12); }
-unsigned zgx_mE(void) { return (unsigned) mem_Read16((msh2.pc & 0x0FFFFFFF) - 14); }
-unsigned zgx_mt(void) { return (unsigned)(msh2.sr & 1); }
