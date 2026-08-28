@@ -395,25 +395,31 @@ int YabauseEmulate(void) {
          yabsys.SH2CycleFrac += cyclesinc;
          u32 sh2cycles = (yabsys.SH2CycleFrac >> (YABSYS_TIMING_BITS + 1)) << 1;
          yabsys.SH2CycleFrac &= ((YABSYS_TIMING_MASK << 1) | 1);
-			//Run the SH2s. FIX deadlock: si ambos activos, alternar en pasos chicos
-			//para propagar cambios de memoria compartida (semaforo TAS, flags). Ver
-			//VC2_DIAGNOSTICO_FINAL.md. Alternancia fina tipo "concurrent bus access".
+			//Run the main SH2
 			cycles_start = gettime();
-			extern u8 zgx_syncfino_on;
-			if (zgx_syncfino_on && yabsys.IsSSH2Running) {
-				u32 _step = 32;
-				u32 _done = 0;
-				while (_done < sh2cycles) {
-					u32 _q = (sh2cycles - _done < _step) ? (sh2cycles - _done) : _step;
-					sh2_Exec(&msh2, _q);
-					sh2_Exec(&ssh2, _q);
-					_done += _q;
-				}
-			} else {
-				sh2_Exec(&msh2, sh2cycles);
-				if (yabsys.IsSSH2Running) sh2_Exec(&ssh2, sh2cycles);
+#ifdef USE_SH2_OLD
+			SH2Exec(MSH2, sh2cycles);
+#else
+			//TODO: Cycles are not the same
+			sh2_Exec(&msh2, sh2cycles);
+#endif
+			// FIX VC2: si el master quedo en el spin conocido (0x06000952) esperando al
+			// slave, darle al slave pasadas extra para que avance y complete el handshake.
+			extern u8 zgx_slaveboost_on;
+			if (zgx_slaveboost_on && (msh2.pc & 0x0FFFFFFF) == 0x00000952 && yabsys.IsSSH2Running) {
+				for (int _b = 0; _b < 8; _b++) sh2_Exec(&ssh2, sh2cycles);
 			}
 			osd_ProfAddTime(PROF_SH2M, gettime() - cycles_start);
+			//Run the secondary SH2
+			cycles_start = gettime();
+			if (yabsys.IsSSH2Running)
+#ifdef USE_SH2_OLD
+				SH2Exec(SSH2, sh2cycles);
+#else
+			//TODO: Cycles are not the same
+				sh2_Exec(&ssh2, sh2cycles);
+#endif
+			osd_ProfAddTime(PROF_SH2S, gettime() - cycles_start);
 
 #ifndef SCSP_PLUGIN
 #ifdef USE_SCSP2

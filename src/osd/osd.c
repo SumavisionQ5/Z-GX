@@ -258,20 +258,15 @@ void osd_ProfDraw(void)
 	u32 numc = sprintf(tstr, "%5s:%6d", "TOTAL", total);
 	__osd_DrawText(x, y, tstr, numc);
 	y += 8;
-	{ extern u32 drc_comp_count, drc_inval_count, drc_flush_count, drc_idle_count;
-	   { extern unsigned zgx_mpc2(void), zgx_spc2(void), zgx_mflags(void), zgx_sflags(void);
-	     numc = sprintf(tstr, "MPC:%08X F:%X", zgx_mpc2(), zgx_mflags()); __osd_DrawText(x, y, tstr, numc); y += 8;
-	     numc = sprintf(tstr, "SPC:%08X F:%X", zgx_spc2(), zgx_sflags()); __osd_DrawText(x, y, tstr, numc); y += 8;
-	     numc = sprintf(tstr, "MCYC:%d", (int)({extern unsigned zgx_mcyc(void); zgx_mcyc();})); }
-	{ extern unsigned zgx_mop(void), zgx_sop(void), zgx_mop2(void), zgx_sop2(void);
-	  extern unsigned zgx_m4(void), zgx_m6(void), zgx_m8(void), zgx_mr0(void);
-	  y += 8; numc = sprintf(tstr, "M:%04X %04X %04X %04X %04X T:%X", ({extern unsigned zgx_mE(void);zgx_mE();}), ({extern unsigned zgx_mC(void);zgx_mC();}), ({extern unsigned zgx_mA(void);zgx_mA();}), ({extern unsigned zgx_m8(void);zgx_m8();}), ({extern unsigned zgx_m6(void);zgx_m6();}), ({extern unsigned zgx_mt(void);zgx_mt();})); __osd_DrawText(x, y, tstr, numc);
-	  y += 8; numc = sprintf(tstr, "MSR:%X IMS:%X IST:%X IRQP:%u", ({extern unsigned zgx_msr(void); zgx_msr();}), ({extern unsigned zgx_scuims(void); zgx_scuims();}), ({extern unsigned zgx_scuist(void); zgx_scuist();}), ({extern unsigned zgx_mirqproc(void); zgx_mirqproc();})); __osd_DrawText(x, y, tstr, numc);
-	  extern unsigned zgx_s4(void), zgx_s6(void), zgx_s8(void), zgx_sr0(void), zgx_sr2(void);
-	  y += 8; numc = sprintf(tstr, "S:%04X %04X %04X %04X", zgx_s8(), zgx_s6(), zgx_s4(), zgx_sop2()); __osd_DrawText(x, y, tstr, numc);
-	  y += 8; numc = sprintf(tstr, "SBF:%04X R2:%08X", zgx_sop(), zgx_sr2()); __osd_DrawText(x, y, tstr, numc); }
-	  __osd_DrawText(x, y, tstr, numc);
-	  drc_comp_count=0; drc_inval_count=0; drc_flush_count=0; drc_idle_count=0; }
+	{ extern unsigned zgx_mpc2(void), zgx_spc2(void), zgx_mflags(void), zgx_sflags(void), zgx_mt(void);
+	  extern unsigned zgx_mvbr(void), zgx_mvec(unsigned);
+	  numc = sprintf(tstr, "MPC:%08X T:%X", zgx_mpc2(), zgx_mt()); __osd_DrawText(x, y, tstr, numc); y += 8;
+	  numc = sprintf(tstr, "SPC:%08X", zgx_spc2()); __osd_DrawText(x, y, tstr, numc); y += 8;
+	  numc = sprintf(tstr, "VBR:%08X", zgx_mvbr()); __osd_DrawText(x, y, tstr, numc); y += 8;
+	  numc = sprintf(tstr, "V4:%08X V6:%08X", zgx_mvec(4), zgx_mvec(6)); __osd_DrawText(x, y, tstr, numc); y += 8;
+	  numc = sprintf(tstr, "V9:%08X V12:%08X", zgx_mvec(9), zgx_mvec(18)); __osd_DrawText(x, y, tstr, numc); y += 8;
+	  numc = sprintf(tstr, "V40:%08X", zgx_mvec(0x40)); __osd_DrawText(x, y, tstr, numc);
+	}
 	{ extern u32 cfmt_dbg, bmw_dbg, bmconv_dbg, vdp2_disp_w, screen_enable; 
 		y += 8; numc = sprintf(tstr, "CF:%u", cfmt_dbg); __osd_DrawText(x, y, tstr, numc); 
 		y += 8; numc = sprintf(tstr, "BW:%u", bmw_dbg); __osd_DrawText(x, y, tstr, numc); 

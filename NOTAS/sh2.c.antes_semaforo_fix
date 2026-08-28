@@ -170,8 +170,6 @@ void sh2_Exec(SH2 *sh, u32 cycles)
 {
 	//Update context
 	sh_ctx = sh;
-	if (sh == &msh2) { extern void zgx_LogMasterPC(u32); zgx_LogMasterPC(sh->pc); }
-	if (sh == &ssh2) { extern void zgx_LogSlavePC(u32); zgx_LogSlavePC(sh->pc); }
 	//if (!(sh->flags & SH2_FLAG_SLEEPING)) {
 	sh2_DrcExec(sh, cycles);
 	cycles += sh->cycles;
@@ -926,19 +924,15 @@ u8 sh2_Read8(u32 addr)
 {
 	if ((addr & 0xFE000000) == 0x06000000) {
 		extern u8 *wram;
-		u8 _v = wram[(addr | ((addr >> 6) & 0x100000)) & 0x1FFFFF];
-		// FIX deadlock semaforo TAS: si el SLAVE pollea la misma dir de HWRAM con un
-		// semaforo ocupado (bit7=1) MUCHAS veces (deadlock muerto), devolver 0 una vez
-		// para que el TAS.B lo adquiera y rompa el abrazo mortal. Ver VC2_DIAGNOSTICO_FINAL.md
+		// FIX deadlock: si el SLAVE pollea repetidamente la misma dir de HWRAM (spin
+		// esperando al master), cederle el slice al master. Ver VC2_DIAGNOSTICO_FINAL.md
 		if (sh_ctx->flags & SH2_FLAG_SLAVE) {
 			static u32 _last_addr = 0; static u32 _same_count = 0;
 			if (addr == _last_addr) {
-				_same_count++;
-				if (sh_ctx->cycles < 0) sh_ctx->cycles = 0; // ceder al master
-				if (_same_count >= 2000 && (_v & 0x80)) { _same_count = 0; return _v & 0x7F; } // romper semaforo
+				if (++_same_count >= 8 && sh_ctx->cycles < 0) { sh_ctx->cycles = 0; _same_count = 0; }
 			} else { _last_addr = addr; _same_count = 0; }
 		}
-		return _v;
+		return wram[(addr | ((addr >> 6) & 0x100000)) & 0x1FFFFF];
 	}
 	if ((addr & 0xFFF00000) == 0x00200000) { extern u8 *wram; return wram[addr & 0xFFFFF]; }
 	switch(addr >> 29) {
@@ -1401,74 +1395,3 @@ u8 zgx_slaveboost_on = 0;
 unsigned zgx_sat(unsigned off) { return (unsigned) mem_Read16((ssh2.pc & 0x0FFFFFFF) + off); }
 unsigned zgx_sr1(void) { return (unsigned) ssh2.r[1]; }
 unsigned zgx_tasval(void) { return (unsigned) mem_Read8(ssh2.r[1] & 0x0FFFFFFF); }
-u8 zgx_syncfino_on = 0;
-unsigned zgx_mvbr(void) { return (unsigned) msh2.vbr; }
-unsigned zgx_mvec(unsigned n) { return (unsigned) mem_Read32((msh2.vbr + (n<<2)) & 0x0FFFFFFF); }
-
-// ===== LOG DE SALTOS DEL MASTER (para diagnostico deadlock) =====
-#define ZGX_LOG_SIZE 256
-u32 zgx_pclog[ZGX_LOG_SIZE];
-u32 zgx_pclog_idx = 0;
-u32 zgx_pclog_prev = 0;
-u8 zgx_pclog_on = 1;
-// Registra un salto del master (llamar cuando el PC no es secuencial)
-void zgx_LogMasterPC(u32 pc) {
-	if (!zgx_pclog_on) return;
-	// solo registrar si el PC salto (no secuencial respecto al anterior)
-	if (pc != zgx_pclog_prev) {
-		zgx_pclog[zgx_pclog_idx & (ZGX_LOG_SIZE-1)] = pc;
-		zgx_pclog_idx++;
-	}
-	zgx_pclog_prev = pc;
-}
-// Vuelca el log a la SD
-void zgx_DumpLog(void) {
-	extern char g_device_path[16];
-	char path[64];
-	snprintf(path, sizeof(path), "%sZGX/pclog.txt", g_device_path);
-	FILE *f = fopen(path, "wb");
-	if (!f) return;
-	fprintf(f, "=== LOG SALTOS MASTER (mas viejo -> mas nuevo) ===\n");
-	fprintf(f, "idx total=%u\n", zgx_pclog_idx);
-	u32 start = (zgx_pclog_idx >= ZGX_LOG_SIZE) ? zgx_pclog_idx - ZGX_LOG_SIZE : 0;
-	for (u32 i = start; i < zgx_pclog_idx; i++) {
-		fprintf(f, "%3u: %08X\n", i - start, zgx_pclog[i & (ZGX_LOG_SIZE-1)]);
-	}
-	fprintf(f, "MPC=%08X SPC=%08X MSR=%08X\n", msh2.pc, ssh2.pc, msh2.sr);
-	fclose(f);
-}
-
-// ===== LOG DEL SLAVE (paralelo al master) =====
-u32 zgx_sclog[256];
-u32 zgx_sclog_idx = 0;
-u32 zgx_sclog_prev = 0;
-void zgx_LogSlavePC(u32 pc) {
-	if (!zgx_pclog_on) return;
-	if (pc != zgx_sclog_prev) {
-		zgx_sclog[zgx_sclog_idx & 255] = pc;
-		zgx_sclog_idx++;
-	}
-	zgx_sclog_prev = pc;
-}
-void zgx_DumpSlaveLog(void) {
-	extern char g_device_path[16];
-	char path[64];
-	snprintf(path, sizeof(path), "%sZGX/sclog.txt", g_device_path);
-	FILE *f = fopen(path, "wb");
-	if (!f) return;
-	fprintf(f, "=== LOG SALTOS SLAVE ===\n");
-	fprintf(f, "idx total=%u\n", zgx_sclog_idx);
-	u32 start = (zgx_sclog_idx >= 256) ? zgx_sclog_idx - 256 : 0;
-	for (u32 i = start; i < zgx_sclog_idx; i++) {
-		fprintf(f, "%3u: %08X\n", i - start, zgx_sclog[i & 255]);
-	}
-	fprintf(f, "\n=== BUCLE SLAVE: instrucciones ===\n");
-	fprintf(f, "@06004498:"); for (int i=0;i<12;i++) fprintf(f, " %04X", mem_Read16(0x06004498 + i*2)); fprintf(f, "\n");
-	fprintf(f, "@06004DCC:"); for (int i=0;i<12;i++) fprintf(f, " %04X", mem_Read16(0x06004DCC + i*2)); fprintf(f, "\n");
-	fprintf(f, "@06004DB0:"); for (int i=0;i<16;i++) fprintf(f, " %04X", mem_Read16(0x06004DB0 + i*2)); fprintf(f, "\n");
-	fprintf(f, "SLAVE REGS: ");
-	for (int i=0;i<16;i++) fprintf(f, "R%d=%08X ", i, ssh2.r[i]);
-	fprintf(f, "\n");
-	fprintf(f, "MPC=%08X SPC=%08X SSR=%08X\n", msh2.pc, ssh2.pc, ssh2.sr);
-	fclose(f);
-}

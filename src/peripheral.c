@@ -144,6 +144,7 @@ static void per_GCToSat(u32 indx, u32 *exit_code)
 	//Use C-stick as another button
 	btns |=  (u32) ((perpad[indx].sy > 32) | (perpad[indx].sy < -32)) << GC_BIT_Z2;
 	*exit_code |= (btns & (PAD_BUTTON_START | PAD_TRIGGER_Z)) == (PAD_BUTTON_START | PAD_TRIGGER_Z);
+	if ((btns & (PAD_BUTTON_START | PAD_TRIGGER_Z)) == (PAD_BUTTON_START | PAD_TRIGGER_Z)) { extern void zgx_DumpLog(void), zgx_DumpSlaveLog(void); zgx_DumpLog(); zgx_DumpSlaveLog(); }
 	if ((btns & (PAD_TRIGGER_L | PAD_TRIGGER_R | PAD_TRIGGER_Z)) == (PAD_TRIGGER_L | PAD_TRIGGER_R | PAD_TRIGGER_Z)) dump_memory();
 	{ static u32 _prev=0; u32 _now=((btns & (PAD_TRIGGER_L|PAD_TRIGGER_R|PAD_BUTTON_START))==(PAD_TRIGGER_L|PAD_TRIGGER_R|PAD_BUTTON_START)); extern u32 snd_muted; if(_now && !_prev) snd_muted ^= 1; _prev=_now; } //TOGGLE sonido L+R+START
 	{ static u32 _pp=0; u32 _pn=((btns & (PAD_TRIGGER_R|PAD_TRIGGER_Z))==(PAD_TRIGGER_R|PAD_TRIGGER_Z)); extern u32 _prof_on; if(_pn && !_pp) _prof_on ^= 1; _pp=_pn; } //TOGGLE overlay abajo R+Z

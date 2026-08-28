@@ -65,3 +65,35 @@ esperando T=1. El handler del VBlank no cambia T ni el flujo. Puede ser:
 2. El master espera un valor en memoria que el slave escribe (el slave llega a 0x06004DCC pero no completa).
 3. Bug en como el dynarec maneja el RTE o el LDC SR en este contexto.
 SF03 es un caso DISTINTO (IRQP fijo, master deja de recibir IRQs) - no mezclar con VC2.
+
+## ★★★ HALLAZGO CLAVE (sesion Aug 28): EL PROBLEMA ES EL TAS.B ★★★
+Con logs a la SD (pclog.txt master, sclog.txt slave) se descubrio:
+- **El MASTER NO esta trabado**: corre un bucle de juego ACTIVO y variado
+  (06000952->06003DBA->06000846->[varias]->0601xxxx->vuelve). Ejecuta codigo real.
+- **El SLAVE SI esta trabado**: rebota entre SOLO 2 direcciones 0x06004498 <-> 0x06004DCC.
+- Bucle del slave en 0x06004DCC (decodificado):
+    411B TAS.B @R1      (R1=0x260CD7D0 = semaforo, cache-through de 0x060CD7D0)
+    8D1F BT/S +offset   (si T=1 = consiguio semaforo, SALTA y avanza)
+    E000 MOV #0,R0
+    D20B MOV.L @(pc),R2
+    6020 MOV.B @R2,R0   (R2=0x060C8019)
+    8800 CMP/EQ #0,R0
+    8BF8 BF -8          (vuelve a 0x06004DCC)
+  Registros slave: R1=260CD7D0 R2=060C8019 R3=060C801F R4=4 SSR=0xE0.
+- El slave hace TAS sobre el semaforo. Si esta libre (0) -> T=1 -> avanza. Si ocupado
+  (0x80) -> T=0 -> gira. El semaforo esta CLAVADO en 0x80 -> el slave nunca avanza.
+
+## EXPERIMENTO: modificar el T bit del TAS en el dynarec (compiler.c:1073)
+- Original: PPCC_RLWIMI(GP_SR, GP_TMP, 27, 31, 31) tras CNTLZW. Cotton 2 (que usa TAS) FUNCIONA.
+- Cambio a shift 26: MOVIO los PCs del deadlock (MPC 952->4698 T=1, SPC DCC->46B4) pero
+  ROMPIO Cotton 2 y NO arreglo los negros. REVERTIDO.
+- CONCLUSION: el TAS.B es el punto correcto (tocarlo mueve el deadlock) pero el fix del
+  bit fue incorrecto. El original NO esta del todo roto (Cotton 2 anda). El bug es mas sutil:
+  probablemente la ATOMICIDAD del TAS (Read8+Write8 con bloques alternados) o la coherencia
+  del semaforo entre master y slave, NO el calculo del T bit.
+
+## PROXIMO PASO
+El master corre bien pero nunca libera el semaforo 0x060CD7D0 en el momento que el slave
+hace TAS. Ver si el master escribe 0 en 0x060CD7D0 alguna vez (loguear accesos del master
+a esa dir). Si el master nunca lo libera -> el semaforo lo debe liberar el propio codigo
+tras conseguirlo. Revisar la logica completa del semaforo (quien escribe 0).
