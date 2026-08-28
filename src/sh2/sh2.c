@@ -1391,3 +1391,4 @@ unsigned zgx_mA(void) { return (unsigned) mem_Read16((msh2.pc & 0x0FFFFFFF) - 10
 unsigned zgx_mC(void) { return (unsigned) mem_Read16((msh2.pc & 0x0FFFFFFF) - 12); }
 unsigned zgx_mE(void) { return (unsigned) mem_Read16((msh2.pc & 0x0FFFFFFF) - 14); }
 unsigned zgx_mt(void) { return (unsigned)(msh2.sr & 1); }
+u8 zgx_slaveboost_on = 0;

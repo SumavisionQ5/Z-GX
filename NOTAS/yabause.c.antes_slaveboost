@@ -403,12 +403,6 @@ int YabauseEmulate(void) {
 			//TODO: Cycles are not the same
 			sh2_Exec(&msh2, sh2cycles);
 #endif
-			// FIX VC2: si el master quedo en el spin conocido (0x06000952) esperando al
-			// slave, darle al slave pasadas extra para que avance y complete el handshake.
-			extern u8 zgx_slaveboost_on;
-			if (zgx_slaveboost_on && (msh2.pc & 0x0FFFFFFF) == 0x00000952 && yabsys.IsSSH2Running) {
-				for (int _b = 0; _b < 8; _b++) sh2_Exec(&ssh2, sh2cycles);
-			}
 			osd_ProfAddTime(PROF_SH2M, gettime() - cycles_start);
 			//Run the secondary SH2
 			cycles_start = gettime();
