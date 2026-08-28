@@ -926,21 +926,25 @@ u8 sh2_Read8(u32 addr)
 {
 	if ((addr & 0xFE000000) == 0x06000000) {
 		extern u8 *wram;
-		return wram[(addr | ((addr >> 6) & 0x100000)) & 0x1FFFFF];
+		u8 _v = wram[(addr | ((addr >> 6) & 0x100000)) & 0x1FFFFF];
+		// FIX deadlock semaforo TAS: si el SLAVE pollea la misma dir de HWRAM con un
+		// semaforo ocupado (bit7=1) MUCHAS veces (deadlock muerto), devolver 0 una vez
+		// para que el TAS.B lo adquiera y rompa el abrazo mortal. Ver VC2_DIAGNOSTICO_FINAL.md
+		if (sh_ctx->flags & SH2_FLAG_SLAVE) {
+			static u32 _last_addr = 0; static u32 _same_count = 0;
+			if (addr == _last_addr) {
+				_same_count++;
+				if (sh_ctx->cycles < 0) sh_ctx->cycles = 0; // ceder al master
+				if (_same_count >= 2000 && (_v & 0x80)) { _same_count = 0; return _v & 0x7F; } // romper semaforo
+			} else { _last_addr = addr; _same_count = 0; }
+		}
+		return _v;
 	}
 	if ((addr & 0xFFF00000) == 0x00200000) { extern u8 *wram; return wram[addr & 0xFFFFF]; }
 	switch(addr >> 29) {
 		case 0x1:	//Cache-through area
 		case 0x5:	sh_ctx->cycles += mem_CyclesR(addr);
 		case 0x0:	//Cache area
-			// FIX deadlock TAS: si el SLAVE lee la misma dir por cache-through en
-			// spin (TAS del semaforo huerfano), ceder al master para que corra y
-			// libere el semaforo. NO falsifica valores. Ver VC2_DIAGNOSTICO_FINAL.md
-			if (sh_ctx->flags & SH2_FLAG_SLAVE) {
-				static u32 _cta = 0; static u32 _ctc = 0;
-				if (addr == _cta) { if (++_ctc >= 4 && sh_ctx->cycles < 0) { sh_ctx->cycles = 0; _ctc = 0; } }
-				else { _cta = addr; _ctc = 0; }
-			}
 			return mem_Read8(addr & 0x0FFFFFFF);
 			//addr &= 0x0FFFFFFF;
 			//return mem_read8_arr[(addr >> 19) & 0xFF](addr);
@@ -1010,9 +1014,10 @@ u32 sh2_Read32(u32 addr)
 	}
 	return 0xFFFFFFFF;
 }
+
+
 void sh2_Write8(u32 addr, u8 val)
 {
-	{ extern u32 zgx_sem_mw, zgx_sem_sw, zgx_sem_lastw, zgx_sem_mw0; if ((addr & 0x0FFFFFFF) == 0x060CD7D0) { if (sh_ctx->flags & SH2_FLAG_SLAVE) zgx_sem_sw++; else { zgx_sem_mw++; if(val==0){ zgx_sem_mw0++; if(sh_ctx->cycles<0) sh_ctx->cycles=0; } } zgx_sem_lastw = val; } }
 	drc_CheckWrite(addr);
 	if ((addr & 0xFE000000) == 0x06000000) { extern u8 *wram; wram[(addr | ((addr >> 6) & 0x100000)) & 0x1FFFFF] = val; return; }
 	if ((addr & 0xFFF00000) == 0x00200000) { extern u8 *wram; wram[addr & 0xFFFFF] = val; return; }
@@ -1464,10 +1469,6 @@ void zgx_DumpSlaveLog(void) {
 	fprintf(f, "SLAVE REGS: ");
 	for (int i=0;i<16;i++) fprintf(f, "R%d=%08X ", i, ssh2.r[i]);
 	fprintf(f, "\n");
-	{ extern u32 zgx_sem_mw, zgx_sem_sw, zgx_sem_lastw, zgx_sem_mw0; fprintf(f, "SEM 0x060CD7D0: master_writes=%u (ceros=%u) slave_writes=%u lastval=%02X\n", zgx_sem_mw, zgx_sem_mw0, zgx_sem_sw, zgx_sem_lastw); }
 	fprintf(f, "MPC=%08X SPC=%08X SSR=%08X\n", msh2.pc, ssh2.pc, ssh2.sr);
 	fclose(f);
 }
-
-// Contadores de acceso al semaforo 0x060CD7D0 (diagnostico)
-u32 zgx_sem_mr = 0, zgx_sem_mw = 0, zgx_sem_sr = 0, zgx_sem_sw = 0, zgx_sem_lastw = 0xFFFF, zgx_sem_mw0 = 0;

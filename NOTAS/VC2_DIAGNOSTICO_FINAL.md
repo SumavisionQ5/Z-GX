@@ -97,3 +97,32 @@ El master corre bien pero nunca libera el semaforo 0x060CD7D0 en el momento que 
 hace TAS. Ver si el master escribe 0 en 0x060CD7D0 alguna vez (loguear accesos del master
 a esa dir). Si el master nunca lo libera -> el semaforo lo debe liberar el propio codigo
 tras conseguirlo. Revisar la logica completa del semaforo (quien escribe 0).
+
+## ★★★ DIAGNOSTICO DEFINITIVO (Aug 28): RACE CONDITION DEL SEMAFORO TAS ★★★
+Contadores de acceso al semaforo 0x060CD7D0 (logueados a la SD):
+- master_writes=183 (ceros=183): el MASTER SIEMPRE libera el semaforo (escribe 0x00) las 183 veces.
+- slave_writes=4.5-10 MILLONES: el SLAVE hace TAS millones de veces (cada TAS escribe 0x80).
+- lastval=80: el ultimo valor casi siempre es 0x80 (del slave).
+PROPORCION: por cada liberacion del master (183), el slave hace ~25000-55000 TAS.
+=> RACE CONDITION: el master libera (0x00) pero el slave gira tan rapido que su propio
+   TAS re-escribe 0x80 antes de que el slave "aproveche" el 0x00 del master. El slave
+   casi nunca lee el 0x00 fresco -> gira para siempre.
+
+## FIX PROBADO: cortar slice del master al escribir 0 en el semaforo (sh2_Write8)
+- Cuando el master escribe 0x00 en 0x060CD7D0, se pone sh_ctx->cycles=0 para cederle al slave.
+- RESULTADO: el slave A VECES avanza un instante (se vio SPC=0x20000200, PCs variados) pero
+  VUELVE a trabarse en el semaforo (SPC=0x06004DCC). NO destraba de forma estable.
+- Cotton 2 (que usa TAS) sigue OK con este fix.
+- CONCLUSION: el fix de timing no basta. La race es demasiado cerrada.
+
+## EL FIX REAL PENDIENTE: atomicidad del TAS.B entre CPUs
+El TAS.B debe ser atomico respecto al otro SH2 (en hardware bloquea el bus). En el dynarec,
+entre el sh2_Read8 y el sh2_Write8 del TAS (compiler.c:1069 SH2JIT_TAS), el otro SH2 corre
+bloques enteros. Esto es exactamente "SH2/SCU concurrent access on CPU-bus" de Kronos.
+Opciones a evaluar (sesion dedicada):
+1. Cuando el SLAVE hace TAS y lee 0x00 (semaforo libre), garantizar que NADA lo pise hasta
+   que el slave complete su seccion (dificil sin reescribir el scheduler).
+2. Detectar el patron especifico (slave en TAS-spin sobre semaforo que el master libera) y
+   forzar que el slave "gane": cuando el master escribe 0, marcar el semaforo como "reservado
+   para el slave" hasta su proximo TAS.
+3. Correr el slave instruccion-por-instruccion (interpretador) SOLO cuando esta en un TAS-spin.

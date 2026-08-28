@@ -1012,7 +1012,7 @@ u32 sh2_Read32(u32 addr)
 }
 void sh2_Write8(u32 addr, u8 val)
 {
-	{ extern u32 zgx_sem_mw, zgx_sem_sw, zgx_sem_lastw, zgx_sem_mw0; if ((addr & 0x0FFFFFFF) == 0x060CD7D0) { if (sh_ctx->flags & SH2_FLAG_SLAVE) zgx_sem_sw++; else { zgx_sem_mw++; if(val==0){ zgx_sem_mw0++; if(sh_ctx->cycles<0) sh_ctx->cycles=0; } } zgx_sem_lastw = val; } }
+	{ extern u32 zgx_sem_mw, zgx_sem_sw, zgx_sem_lastw, zgx_sem_mw0; if ((addr & 0x0FFFFFFF) == 0x060CD7D0) { if (sh_ctx->flags & SH2_FLAG_SLAVE) zgx_sem_sw++; else { zgx_sem_mw++; if(val==0) zgx_sem_mw0++; } zgx_sem_lastw = val; } }
 	drc_CheckWrite(addr);
 	if ((addr & 0xFE000000) == 0x06000000) { extern u8 *wram; wram[(addr | ((addr >> 6) & 0x100000)) & 0x1FFFFF] = val; return; }
 	if ((addr & 0xFFF00000) == 0x00200000) { extern u8 *wram; wram[addr & 0xFFFFF] = val; return; }
