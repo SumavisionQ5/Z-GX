@@ -433,7 +433,7 @@ int YabauseEmulate(void) {
 
 		//SCU
 		cycles_start = gettime();
-		ScuExec(sh2cycles);
+		ScuExec(sh2cycles / 2);
 		osd_ProfAddTime(PROF_SCU, gettime() - cycles_start);
 
       }

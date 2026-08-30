@@ -126,3 +126,24 @@ Opciones a evaluar (sesion dedicada):
    forzar que el slave "gane": cuando el master escribe 0, marcar el semaforo como "reservado
    para el slave" hasta su proximo TAS.
 3. Correr el slave instruccion-por-instruccion (interpretador) SOLO cuando esta en un TAS-spin.
+
+## ★★★ MAPEO COMPLETO DEL DEADLOCK (Aug 28 noche) ★★★
+ESTRUCTURA DE SEMAFOROS MULTIPLES en 0x060CD7D0-D5 (array de 6 locks del BIOS):
+- Slave 0x06004DCC: TAS.B @0x060CD7D0
+- Slave 0x06004E16: TAS.B @0x060CD7D1 (siguiente lock)
+- Slave usa R2=0x060CD7D5, R3=0x060CD7D3 (toda la fila D0-D5)
+- Forzar un semaforo mueve el slave al siguiente -> es una CADENA de locks.
+- Parte del codigo del slave corre en un handler (0x060044E0 termina en RTE).
+
+MASTER: en estado normal esta en 0x06000952 (WAIT LOOP, mascara 15, BF a si mismo).
+- vec VBlankIN (0x40) = 0x06000840 (handler real, trampolin a dispatcher).
+- El master NUNCA llega a 0x06004D50 (su parte del protocolo de semaforos).
+- El master procesa VBlanks (IRQP sube) pero no sale del wait hacia el juego.
+
+RAIZ IDENTIFICADA: el master esta atascado en el wait 0x06000952 y nunca ejecuta su
+parte del handshake de semaforos (0x06004D50). Por eso el slave espera para siempre.
+La pregunta: que deberia llevar al master de 0x06000952 a 0x06004D50? Esa transicion
+no ocurre. Afecta intreprete y dynarec igual -> es logica de sistema/arranque.
+
+DESCARTADO definitivamente: atomicidad TAS, timing puntual, forzar semaforos/flags
+(mueve el sintoma, no resuelve). El bug esta en por que el master no progresa del wait.

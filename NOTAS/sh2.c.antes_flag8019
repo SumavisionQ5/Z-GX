@@ -933,14 +933,6 @@ u8 sh2_Read8(u32 addr)
 		case 0x1:	//Cache-through area
 		case 0x5:	sh_ctx->cycles += mem_CyclesR(addr);
 		case 0x0:	//Cache area
-			// CAPTURA: forzar que el slave gane el TAS del semaforo (0x060CD7D0) tras N
-			// lecturas, para capturar su seccion critica en el sclog.
-			if (sh_ctx->flags & SH2_FLAG_SLAVE) {
-				if ((addr & 0x0FFFFFFF) == 0x060CD7D0) {
-					static u32 _cc = 0;
-					if (++_cc >= 50) { _cc = 0; return 0x00; }
-				}
-			}
 			return mem_Read8(addr & 0x0FFFFFFF);
 		case 0x3:	//Adress Array, read/write space
 			return 0;
@@ -1459,10 +1451,6 @@ void zgx_DumpSlaveLog(void) {
 	fprintf(f, "@06000952:"); for (int i=0;i<8;i++) fprintf(f, " %04X", mem_Read16(0x06000952 + i*2)); fprintf(f, "\n");
 	fprintf(f, "@06000940:"); for (int i=0;i<12;i++) fprintf(f, " %04X", mem_Read16(0x06000940 + i*2)); fprintf(f, "\n");
 	fprintf(f, "wait poll addr 0x0600034C=%08X 0x06000348=%08X\n", mem_Read32(0x0600034C), mem_Read32(0x06000348));
-	fprintf(f, "@06000664(handler):"); for (int i=0;i<24;i++) fprintf(f, " %04X", mem_Read16(0x06000664 + i*2)); fprintf(f, "\n");
-	fprintf(f, "vec VBlankIN 0x06000080=%08X  status 0x06000348val=%08X\n", mem_Read32(0x06000080), mem_Read32(0x06000348));
-	fprintf(f, "VECTORES SH2 master (0x06000000+):\n");
-	for (int v=0x40; v<=0x4F; v++) fprintf(f, "  vec %02X = %08X\n", v, mem_Read32(0x06000000 + v*4));
 	fprintf(f, "@06004D50:"); for (int i=0;i<20;i++) fprintf(f, " %04X", mem_Read16(0x06004D50 + i*2)); fprintf(f, "\n");
 	fprintf(f, "@0600093C:"); for (int i=0;i<16;i++) fprintf(f, " %04X", mem_Read16(0x0600093C + i*2)); fprintf(f, "\n");
 	fprintf(f, "@06003DBA:"); for (int i=0;i<12;i++) fprintf(f, " %04X", mem_Read16(0x06003DBA + i*2)); fprintf(f, "\n");
@@ -1474,8 +1462,6 @@ void zgx_DumpSlaveLog(void) {
 	fprintf(f, "@06004498:"); for (int i=0;i<12;i++) fprintf(f, " %04X", mem_Read16(0x06004498 + i*2)); fprintf(f, "\n");
 	fprintf(f, "@06004DCC:"); for (int i=0;i<12;i++) fprintf(f, " %04X", mem_Read16(0x06004DCC + i*2)); fprintf(f, "\n");
 	fprintf(f, "@06004DB0:"); for (int i=0;i<16;i++) fprintf(f, " %04X", mem_Read16(0x06004DB0 + i*2)); fprintf(f, "\n");
-	fprintf(f, "@06004E16:"); for (int i=0;i<16;i++) fprintf(f, " %04X", mem_Read16(0x06004E16 + i*2)); fprintf(f, "\n");
-	fprintf(f, "@060044E0:"); for (int i=0;i<16;i++) fprintf(f, " %04X", mem_Read16(0x060044E0 + i*2)); fprintf(f, "\n");
 	fprintf(f, "SLAVE REGS: ");
 	for (int i=0;i<16;i++) fprintf(f, "R%d=%08X ", i, ssh2.r[i]);
 	fprintf(f, "\n");
