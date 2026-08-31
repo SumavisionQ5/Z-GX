@@ -1010,6 +1010,7 @@ u32 sh2_Read32(u32 addr)
 void sh2_Write8(u32 addr, u8 val)
 {
 	{ extern u32 zgx_sem_mw, zgx_sem_sw, zgx_sem_lastw, zgx_sem_mw0; if ((addr & 0x0FFFFFFF) == 0x060CD7D0) { if (sh_ctx->flags & SH2_FLAG_SLAVE) zgx_sem_sw++; else { zgx_sem_mw++; if(val==0) zgx_sem_mw0++; } zgx_sem_lastw = val; } }
+	{ extern u32 zgx_sem_addr_m, zgx_sem_addr_s; if ((addr & 0x0FFFFFFF) == 0x060CD7D0) { if (sh_ctx->flags & SH2_FLAG_SLAVE) zgx_sem_addr_s = addr; else zgx_sem_addr_m = addr; } }
 	drc_CheckWrite(addr);
 	if ((addr & 0xFE000000) == 0x06000000) { extern u8 *wram; wram[(addr | ((addr >> 6) & 0x100000)) & 0x1FFFFF] = val; return; }
 	if ((addr & 0xFFF00000) == 0x00200000) { extern u8 *wram; wram[addr & 0xFFFFF] = val; return; }
@@ -1478,13 +1479,23 @@ void zgx_DumpSlaveLog(void) {
 	for (int i=0;i<16;i++) fprintf(f, "R%d=%08X ", i, ssh2.r[i]);
 	fprintf(f, "\n");
 	{ extern u32 zgx_sem_mw, zgx_sem_sw, zgx_sem_lastw, zgx_sem_mw0; fprintf(f, "SEM 0x060CD7D0: master_writes=%u (ceros=%u) slave_writes=%u lastval=%02X\n", zgx_sem_mw, zgx_sem_mw0, zgx_sem_sw, zgx_sem_lastw); }
+	{ extern u32 zgx_sem_addr_m, zgx_sem_addr_s; fprintf(f, "SEM addr: master escribe por %08X, slave lee/escribe por %08X\n", zgx_sem_addr_m, zgx_sem_addr_s); }
+	{
+		extern u8 *wram;
+		u32 a = 0x060CD7D0;
+		u32 idx_cache = (a | ((a >> 6) & 0x100000)) & 0x1FFFFF;
+		fprintf(f, "COHERENCIA semaforo:\n");
+		fprintf(f, "  ruta cacheada 0x06: wram[%05X] = %02X\n", idx_cache, wram[idx_cache]);
+		fprintf(f, "  ruta cache-through mem_Read8(0x060CD7D0) = %02X\n", mem_Read8(0x060CD7D0));
+		fprintf(f, "  addr slave 0x260CD7D0 & 0x0FFFFFFF = %08X\n", 0x260CD7D0 & 0x0FFFFFFF);
+	}
 	{ extern u32 zgx_slave_vdp1, zgx_slave_vdp2; extern u32 zgx_mst_vdp1, zgx_mst_vdp2; fprintf(f, "VDP writes: SLAVE V1=%u V2=%u  MASTER V1=%u V2=%u\n", zgx_slave_vdp1, zgx_slave_vdp2, zgx_mst_vdp1, zgx_mst_vdp2); }
 	fprintf(f, "MPC=%08X SPC=%08X SSR=%08X\n", msh2.pc, ssh2.pc, ssh2.sr);
 	fclose(f);
 }
 
 // Contadores de acceso al semaforo 0x060CD7D0 (diagnostico)
-u32 zgx_sem_mr = 0, zgx_sem_mw = 0, zgx_sem_sr = 0, zgx_sem_sw = 0, zgx_sem_lastw = 0xFFFF, zgx_sem_mw0 = 0;
+u32 zgx_sem_mr = 0, zgx_sem_mw = 0, zgx_sem_sr = 0, zgx_sem_sw = 0, zgx_sem_lastw = 0xFFFF, zgx_sem_mw0 = 0, zgx_sem_addr_m = 0, zgx_sem_addr_s = 0;
 
 // Diagnostico: escrituras del slave al VDP tras destrabar los locks
 u32 zgx_slave_vdp1 = 0, zgx_slave_vdp2 = 0, zgx_mst_vdp1 = 0, zgx_mst_vdp2 = 0;

@@ -171,3 +171,29 @@ otra mitad del fix de VC2, o revelar que falta).
 ## ESTADO: el bug esta en la fase de INIT/handshake, confirmado ANTES del render.
 Afecta intreprete y dynarec igual. El master corre su main loop (0x06000952, espera
 VBlank) pero el slave no completa su init (locks) -> el juego no avanza a render.
+
+## ★★★★★ EL FIX REAL ENCONTRADO (PicoDrive poll detection) ★★★★★
+PicoDrive (saturn-wii/picodrive-ref) corre 32X (2 SH2) a 60fps en Wii/PowerPC SIN deadlock.
+Su mecanismo (pico/32x/memory.c:118-171) es la SOLUCION a nuestro deadlock master-slave:
+
+p32x_sh2_poll_detect(a, sh2, flags, maxcnt): cuando un SH2 LEE:
+  - Si lee la misma dir (a - poll_addr <= 3) en pocos ciclos (<20), repetido >= maxcnt(3):
+    -> marca sh2->state |= CPOLL (polling detectado)
+    -> sh2_end_run(sh2, 0): CORTA la ejecucion del SH2 (deja de girar, no quema ciclos)
+    -> guarda poll_addr
+p32x_sh2_poll_event(a, sh2, flags, cycles): cuando el OTRO SH2 ESCRIBE esa dir:
+  - Si el SH2 estaba polleando esa dir -> sh2->state &= ~CPOLL (LO DESPIERTA)
+
+RESUMEN DEL FIX: detectar el poll-spin del slave (lecturas repetidas de la misma dir),
+PARARLO (no girar), y DESPERTARLO cuando el master escribe esa direccion. Esto evita
+el deadlock sin sincronizacion fina costosa. Es el "idle loop detection + wake on write".
+
+NUESTRO CASO: el slave pollea el semaforo 0x060CD7D0 (TAS). Aplicar:
+1. En sh2_Read8/Read16 (o en el TAS): detectar lecturas repetidas de la misma dir por el
+   slave -> marcar polling + cortar su ejecucion (poner cycles a 0 / salir de sh2_Exec).
+2. En sh2_Write8 (cuando el master escribe esa dir): despertar al slave (limpiar polling).
+El TAS complica (siempre escribe 0x80), asi que la deteccion debe ser sobre la LECTURA
+del TAS y el despertar sobre la escritura del MASTER (val=0).
+
+TODO: implementar poll_addr/poll_cnt/poll_state en el SH2 de este fork, portando la
+logica de PicoDrive. Es el fix real (no parche): mecanismo probado en Wii/PowerPC/2xSH2.
