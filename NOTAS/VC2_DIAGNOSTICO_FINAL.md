@@ -147,3 +147,27 @@ no ocurre. Afecta intreprete y dynarec igual -> es logica de sistema/arranque.
 
 DESCARTADO definitivamente: atomicidad TAS, timing puntual, forzar semaforos/flags
 (mueve el sintoma, no resuelve). El bug esta en por que el master no progresa del wait.
+
+## ★★★ CIERRE DIAGNOSTICO (Aug 28): VC2 NUNCA RENDERIZA ★★★
+Contador de escrituras al VDP durante VC2 trabado:
+- SLAVE: VDP1=0 VDP2=0 (nunca dibuja, atascado en locks 0x060CD7Dx)
+- MASTER: VDP1=0 VDP2=2 (solo 2 writes a VDP2 = config inicial, NO render)
+=> Ningun core llega a la fase de render. El deadlock de init (handshake de semaforos
+   0x060CD7D0-DF entre master y slave) ocurre ANTES del dibujo. Pantalla negra = consecuencia.
+   NO es problema del VDP; el juego nunca le manda datos.
+
+## EXPERIMENTOS QUE MUEVEN PERO NO RESUELVEN (descartados definitivamente):
+- Forzar que el slave gane los locks (devolver 0 tras N lecturas en 0x060CD7D0-D5):
+  mueve el slave de 0x06004DCC -> 0x06006Exx (codigo nuevo) PERO SLAVE VDP=0 (callejon,
+  no hace trabajo grafico). El "avance" en el log NO es progreso real. La pantalla sigue
+  igual (loading -> negro, como desde el fix de Cotton 2).
+- Todos los fixes de timing/atomicidad/semaforo/flag: no cambian el resultado visual.
+
+## PISTA SIN EXPLORAR: el loading de VC2 aparece DESDE el fix de Cotton 2.
+Antes de arreglar Cotton 2, VC2 no mostraba ni el loading. Ese cambio movio VC2 de
+"nada" a "loading + negro". Investigar que commit arreglo Cotton 2 (puede tener la
+otra mitad del fix de VC2, o revelar que falta).
+
+## ESTADO: el bug esta en la fase de INIT/handshake, confirmado ANTES del render.
+Afecta intreprete y dynarec igual. El master corre su main loop (0x06000952, espera
+VBlank) pero el slave no completa su init (locks) -> el juego no avanza a render.

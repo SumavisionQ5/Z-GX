@@ -933,10 +933,9 @@ u8 sh2_Read8(u32 addr)
 		case 0x1:	//Cache-through area
 		case 0x5:	sh_ctx->cycles += mem_CyclesR(addr);
 		case 0x0:	//Cache area
-			// CAPTURA: forzar que el slave gane el TAS del semaforo (0x060CD7D0) tras N
-			// lecturas, para capturar su seccion critica en el sclog.
 			if (sh_ctx->flags & SH2_FLAG_SLAVE) {
-				if ((addr & 0x0FFFFFFF) == 0x060CD7D0) {
+				u32 ca = addr & 0x0FFFFFFF;
+				if (ca >= 0x060CD7D0 && ca <= 0x060CD7D5) {
 					static u32 _cc = 0;
 					if (++_cc >= 50) { _cc = 0; return 0x00; }
 				}
@@ -1037,6 +1036,7 @@ void sh2_Write8(u32 addr, u8 val)
 void sh2_Write16(u32 addr, u16 val)
 {
 	drc_CheckWrite(addr);
+	{ extern u32 zgx_slave_vdp1, zgx_slave_vdp2; { extern u32 zgx_slave_vdp1, zgx_slave_vdp2, zgx_mst_vdp1, zgx_mst_vdp2; u32 a=addr&0x0FFFFFFF; int sl=(sh_ctx->flags & SH2_FLAG_SLAVE)?1:0; if((a&0x0FF00000)==0x05C00000){ if(sl)zgx_slave_vdp1++; else zgx_mst_vdp1++; } else if((a&0x0FF00000)==0x05E00000){ if(sl)zgx_slave_vdp2++; else zgx_mst_vdp2++; } } }
 	if ((addr & 0xFE000000) == 0x06000000) { extern u8 *wram; *((u16*)(wram + ((addr | ((addr >> 6) & 0x100000)) & 0x1FFFFF))) = val; return; }
 	if ((addr & 0xFFF00000) == 0x00200000) { extern u8 *wram; *((u16*)(wram + (addr & 0xFFFFF))) = val; return; }
 	switch(addr >> 29) {
@@ -1474,15 +1474,17 @@ void zgx_DumpSlaveLog(void) {
 	fprintf(f, "@06004498:"); for (int i=0;i<12;i++) fprintf(f, " %04X", mem_Read16(0x06004498 + i*2)); fprintf(f, "\n");
 	fprintf(f, "@06004DCC:"); for (int i=0;i<12;i++) fprintf(f, " %04X", mem_Read16(0x06004DCC + i*2)); fprintf(f, "\n");
 	fprintf(f, "@06004DB0:"); for (int i=0;i<16;i++) fprintf(f, " %04X", mem_Read16(0x06004DB0 + i*2)); fprintf(f, "\n");
-	fprintf(f, "@06004E16:"); for (int i=0;i<16;i++) fprintf(f, " %04X", mem_Read16(0x06004E16 + i*2)); fprintf(f, "\n");
-	fprintf(f, "@060044E0:"); for (int i=0;i<16;i++) fprintf(f, " %04X", mem_Read16(0x060044E0 + i*2)); fprintf(f, "\n");
 	fprintf(f, "SLAVE REGS: ");
 	for (int i=0;i<16;i++) fprintf(f, "R%d=%08X ", i, ssh2.r[i]);
 	fprintf(f, "\n");
 	{ extern u32 zgx_sem_mw, zgx_sem_sw, zgx_sem_lastw, zgx_sem_mw0; fprintf(f, "SEM 0x060CD7D0: master_writes=%u (ceros=%u) slave_writes=%u lastval=%02X\n", zgx_sem_mw, zgx_sem_mw0, zgx_sem_sw, zgx_sem_lastw); }
+	{ extern u32 zgx_slave_vdp1, zgx_slave_vdp2; extern u32 zgx_mst_vdp1, zgx_mst_vdp2; fprintf(f, "VDP writes: SLAVE V1=%u V2=%u  MASTER V1=%u V2=%u\n", zgx_slave_vdp1, zgx_slave_vdp2, zgx_mst_vdp1, zgx_mst_vdp2); }
 	fprintf(f, "MPC=%08X SPC=%08X SSR=%08X\n", msh2.pc, ssh2.pc, ssh2.sr);
 	fclose(f);
 }
 
 // Contadores de acceso al semaforo 0x060CD7D0 (diagnostico)
 u32 zgx_sem_mr = 0, zgx_sem_mw = 0, zgx_sem_sr = 0, zgx_sem_sw = 0, zgx_sem_lastw = 0xFFFF, zgx_sem_mw0 = 0;
+
+// Diagnostico: escrituras del slave al VDP tras destrabar los locks
+u32 zgx_slave_vdp1 = 0, zgx_slave_vdp2 = 0, zgx_mst_vdp1 = 0, zgx_mst_vdp2 = 0;
