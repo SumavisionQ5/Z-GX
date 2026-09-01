@@ -197,3 +197,32 @@ del TAS y el despertar sobre la escritura del MASTER (val=0).
 
 TODO: implementar poll_addr/poll_cnt/poll_state en el SH2 de este fork, portando la
 logica de PicoDrive. Es el fix real (no parche): mecanismo probado en Wii/PowerPC/2xSH2.
+
+## ★★★ AVANCE REAL con PicoDrive poll detect (esta sesion) ★★★
+Se implemento una version SIMPLIFICADA del poll detection de PicoDrive:
+- Deteccion: slave lee la misma dir de HWRAM (0x06xxxxxx) N veces en spin -> zgx_slave_polling=1 + cortar ciclos.
+- Parar: el bucle YabauseEmulate no ejecuta el slave mientras zgx_slave_polling.
+- Despertar: cuando el MASTER escribe esa dir (sh2_Write8) -> zgx_slave_polling=0.
+RESULTADO CLAVE: **SF03 (que NUNCA corrio aca) mostro VDP1=104 VDP2=2756 corriendo**,
+el master ejecutando un game loop SANO y variado (0x06044570->0x06043FB4->0x002002E6->
+0x06018D92->...->vuelve, MSR=0x01 = irqs habilitadas). EL SLAVE SE DESTRABO. Es la
+primera vez que un juego negro avanza de verdad a nivel de CPU.
+
+PROBLEMAS DE LA VERSION SIMPLIFICADA (a resolver):
+- Rompe los juegos que SI funcionaban (el slave queda parado sin despertar bien).
+- Balance imposible con timeout fijo (100=no destraba, sin timeout=rompe buenos).
+- Despertar por interrupcion = contraproducente (el slave recibe VBlanks seguido).
+- Ventana de ciclos simplificada = no captura bien el spin (sh_ctx->cycles no cuadra).
+- Tras ~30seg el VDP cae a 0 (el slave queda muerto).
+
+DATO NUEVO: SF03 usa CARTUCHO RAM 4MB. Con cart apagado VDP1/2 siempre corre; con cart
+encendido en este update corre ~30seg y cae a 0. Hay muchos juegos con VDP1/2 corriendo
+desde hace meses que igual estan negros -> el VDP corriendo NO garantiza imagen (puede
+haber un 2do problema de RENDER aparte del deadlock).
+
+## PROXIMO PASO: implementar el poll detection COMPLETO de PicoDrive
+La version simplificada destraba pero desestabiliza. Portar la version REAL de PicoDrive
+(pico/32x/memory.c:118-171 + sh2.h estados SH2_STATE_CPOLL/SLEEP + poll_fifo + sh2_end_run
+con despertar por escritura Y por sincronizacion de ciclos entre cores). Es mas trabajo
+pero es la que funciona sin romper. El camino es CORRECTO (SF03 destrabo), falta robustez.
+Backups: sh2.c.antes_polldetect, yabause.c.antes_syncfino2 (estado estable actual).
