@@ -339,6 +339,16 @@ u32 per_updatePads()
 				perpad[per_num].y = 0;
 				perpad[per_num].prev_btn = perpad[per_num].btn;
 				perpad[per_num].btn = wpad->btns_h;
+				// LIGHTGUN: si esta activo, leer el puntero IR del Wiimote
+				extern int opt_lightgun;
+				if (opt_lightgun && wpad->ir.valid) {
+					perpad[per_num].is_gun = 1;
+					// IR da coords en pantalla (0..640, 0..480); mapear a Saturn (0..319, 0..223)
+					perpad[per_num].gun_x = (s16)((wpad->ir.x * 320) / 640);
+					perpad[per_num].gun_y = (s16)((wpad->ir.y * 224) / 480);
+				} else {
+					perpad[per_num].is_gun = 0;
+				}
 				per_WiiToSat(per_num, &exit_code);
 				++per_num;
 			} else if (exp_type == WPAD_EXP_CLASSIC) { //Classic controller used
@@ -369,7 +379,19 @@ u32 per_updatePads()
 		if ((port_ofs >> i) & 1) {	//See if port stat must be set
 			per_data.data[size++] = port_stat[port_count++];
 		}
-		if (perpad[i].type != PAD_TYPE_NONE) {
+		if (perpad[i].is_gun) {
+			// LIGHTGUN (PERGUN 0x25): id + 3 bytes (botones, y luego el SMPC lee X/Y por HV)
+			// Formato Saturn: byte botones (bit4=trigger, bit5=start; 0=presionado), X hi/lo, Y hi/lo
+			u8 gb = 0xFF;
+			if (perpad[i].btn & WPAD_BUTTON_B) gb &= ~0x10;   // trigger
+			if (perpad[i].btn & WPAD_BUTTON_PLUS) gb &= ~0x20; // start
+			per_data.data[size++] = PERGUN;
+			per_data.data[size++] = gb;
+			per_data.data[size++] = perpad[i].gun_x >> 8;
+			per_data.data[size++] = perpad[i].gun_x & 0xFF;
+			per_data.data[size++] = perpad[i].gun_y >> 8;
+			per_data.data[size++] = perpad[i].gun_y & 0xFF;
+		} else if (perpad[i].type != PAD_TYPE_NONE) {
 			per_data.data[size++] = PER_ID_DIGITAL;
 			per_data.data[size++] = ~(perpad[i].btn & 0xFF);
 			per_data.data[size++] = ~((perpad[i].btn >> 0x8) & 0xFF);

@@ -36,6 +36,7 @@
 
 #define PERPAD   0x02
 #define PERMOUSE 0xE3
+#define PERGUN   0x25
 
 #define PERCORE_DEFAULT -1
 #define PERCORE_DUMMY 0
@@ -253,6 +254,9 @@ typedef struct PerPad_t {
 	s16 y;
 	s16 sx;
 	s16 sy;
+	u8 is_gun;
+	s16 gun_x;
+	s16 gun_y;
 } PerPad;
 
 extern PerPad perpad[PER_PADMAX];

@@ -544,17 +544,6 @@ static void SmpcSetTiming(void) {
 //////////////////////////////////////////////////////////////////////////////
 
 //XXX: NEEDS UPDATE
-// Handshake TH del lightgun Stunner (portado de Yabause saturn-wii smpc.c:690)
-static u8 do_th_mode(u8 val)
-{
-	switch (val & 0x40) {
-	case 0x40:
-		return 0x70 | ((per_data.data[3] & 0xF) & 0xc);
-	case 0x00:
-		return 0x30 | ((per_data.data[2] >> 4) & 0xf);
-	}
-	return 0;
-}
 void FASTCALL SmpcWriteByte(u32 addr, u8 val) {
 	addr &= 0x7F;
 	smpc_regs[addr] = val;
@@ -586,12 +575,8 @@ void FASTCALL SmpcWriteByte(u32 addr, u8 val) {
 			// FIX ME (should support other peripherals)
 			//SMPC_REG_DDR1 & 0x7F;
 			switch (SMPC_REG_DDR1 & 0x7F) { // Which Control Method do we use?
-				case 0x00: // Modo directo: si es gun y val 0x7F, devolver data[2]
-					if (per_data.data[1] == PERGUN && (val & 0x7F) == 0x7F)
-						SMPC_REG_PDR1 = per_data.data[2];
-					break;
-				case 0x40: // TH Control Method (LIGHTGUN Stunner)
-					SMPC_REG_PDR1 = do_th_mode(val);
+				case 0x40:
+					SMPCLOG("smpc\t: Peripheral TH Control Method not implemented\n");
 					break;
 				case 0x60:
 

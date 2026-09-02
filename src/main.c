@@ -372,10 +372,11 @@ u32 menu_Handle(void)
 	u32 buttons;
 	per_updatePads();
 	buttons = PER_BUTTONS_DOWN(0);
-	// ===== Menu de opciones (X para entrar y salir) =====
+	// ===== Menu de opciones (START+Y para entrar y salir - universal: GC/Wiimote/Classic) =====
 	{
 		static u32 _spv = 0;
-		u32 _sn = (PER_BUTTONS_HELD(0) & PAD_DI_X) ? 1 : 0;
+		u32 _held = PER_BUTTONS_HELD(0);
+		u32 _sn = ((_held & PAD_DI_STR) && (_held & PAD_DI_Y)) ? 1 : 0;
 		if (_sn && !_spv) { opt_in_menu ^= 1; if (opt_in_menu) opt_cursor = 0; }
 		_spv = _sn;
 	}
@@ -660,6 +661,7 @@ int CoreExec()
 	else yabsys.flags &= ~SYS_FLAGS_SHOW_FPS;
 
 	WPAD_SetDataFormat(WPAD_CHAN_ALL,WPAD_FMT_BTNS_ACC_IR);
+	WPAD_SetVRes(WPAD_CHAN_ALL, 640, 480);
 
 	memset(&yinit, 0, sizeof(yabauseinit_struct));
 	//yinit.percoretype = PERCORE_WIICLASSIC;
