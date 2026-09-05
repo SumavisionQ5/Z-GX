@@ -412,8 +412,16 @@ void Vdp2VBlankOUT(void)
 //////////////////////////////////////////////////////////////////////////////
 
 u8 FASTCALL Vdp2ReadByte(u32 addr) {
-   LOG("VDP2 register byte read = %08X\n", addr);
    addr &= 0x1FF;
+   // El gun lee el HV counter por bytes. Devolver los bytes reales de HCNT/VCNT.
+   switch (addr) {
+      case 0x008: return (Vdp2Regs->HCNT >> 8) & 0xFF; // HCNT byte alto
+      case 0x009: return Vdp2Regs->HCNT & 0xFF;         // HCNT byte bajo
+      case 0x00A: return (Vdp2Regs->VCNT >> 8) & 0xFF; // VCNT byte alto
+      case 0x00B: return Vdp2Regs->VCNT & 0xFF;         // VCNT byte bajo
+      case 0x004: return (Vdp2Regs->TVSTAT >> 8) & 0xFF; // TVSTAT alto
+      case 0x005: return Vdp2Regs->TVSTAT & 0xFF;        // TVSTAT bajo
+   }
    return 0;
 }
 
@@ -448,8 +456,10 @@ u16 FASTCALL Vdp2ReadWord(u32 addr) {
       case 0x006:
          return Vdp2Regs->VRSIZE;
       case 0x008:
+         { extern u32 zgx_gun_ddr[8]; zgx_gun_ddr[0] = (Vdp2Regs->HCNT << 16) | (zgx_gun_ddr[0] & 0xFFFF); zgx_gun_ddr[0]++; }
          return Vdp2Regs->HCNT;
       case 0x00A:
+         { extern u32 zgx_gun_ddr[8]; zgx_gun_ddr[1] = Vdp2Regs->VCNT; }
          return Vdp2Regs->VCNT;
 #ifdef GEKKO
       case 0x00E:
@@ -942,4 +952,4 @@ void FASTCALL Vdp2WriteLong(u32 addr, u32 val) {
 
 
 // LIGHTGUN: parametros de calibracion ajustables en vivo (escala en %, offset en unidades)
-int zgx_gun_hscale = 100, zgx_gun_hoff = 0, zgx_gun_vscale = 100, zgx_gun_voff = 0;
+int zgx_gun_hscale = 130, zgx_gun_hoff = 27, zgx_gun_vscale = 120, zgx_gun_voff = 20;

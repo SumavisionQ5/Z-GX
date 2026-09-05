@@ -1511,6 +1511,7 @@ void zgx_DumpSlaveLog(void) {
 	{ extern u32 zgx_gun_ddr[8]; fprintf(f, "LATCH: EXTEN&0x200 count=%u (si es 0, el juego NO habilita el latch)\n", zgx_gun_ddr[7]); }
 	{ extern u32 zgx_gun_ddr[8]; fprintf(f, "INTBACK data[0-2]=%06X data[3-5]=%06X size=%u\n", zgx_gun_ddr[4], zgx_gun_ddr[5], zgx_gun_ddr[6]); }
 	{ extern u32 zgx_gun_ddr[8]; fprintf(f, "IR crudo: x=%u y=%u\n", zgx_gun_ddr[2]>>16, zgx_gun_ddr[2]&0xFFFF); }
+	{ extern u32 zgx_gun_ddr[8]; fprintf(f, "JUEGO leyo HCNT=%u (lecturas=%u) VCNT=%u\n", zgx_gun_ddr[0]>>16, zgx_gun_ddr[0]&0xFFFF, zgx_gun_ddr[1]); }
 	{ extern u32 zgx_gun_ddr[8]; fprintf(f, "LATCH HCNT/VCNT enviado = %08X (HCNT=%u VCNT=%u)\n", zgx_gun_ddr[3], zgx_gun_ddr[3]>>16, zgx_gun_ddr[3]&0xFFFF); }
 	fprintf(f, "MPC=%08X SPC=%08X SSR=%08X\n", msh2.pc, ssh2.pc, ssh2.sr);
 	fclose(f);

@@ -226,3 +226,31 @@ La version simplificada destraba pero desestabiliza. Portar la version REAL de P
 con despertar por escritura Y por sincronizacion de ciclos entre cores). Es mas trabajo
 pero es la que funciona sin romper. El camino es CORRECTO (SF03 destrabo), falta robustez.
 Backups: sh2.c.antes_polldetect, yabause.c.antes_syncfino2 (estado estable actual).
+
+## ★★★ LIGHTGUN STUNNER - ESTADO (esperando info de galagasux/gbatemp) ★★★
+LOGRADO:
+- Reconoce el arma (Mechanical Violator muestra instrucciones de pistola, VC gun adjust OK).
+- Periferico PERGUN 0x25 en INTBACK: data[0]=0xA0 (port status gun), data[1]=0x25,
+  data[2]=botones(0x7C base), data[3-6]=posicion X/Y. Formato Yabause exacto.
+- Botones del gun: trigger=B (bit4 0x10), start=+/A (bit5 0x20). Se leen de gun_btn
+  (botones crudos del Wiimote, ANTES de per_WiiToSat que los pisaba - ESE era el bug del trigger).
+- port_stat[0]=0xA0 cuando is_gun (peripheral.c).
+- Handshake SMPC: do_th_mode (0x40), modo directo (0x00), case 0x60 gun (smpc.c).
+- Latch VDP: Vdp2SendExternalLatch en VBlankOUT si EXTEN&0x200 y EXLE&0x1 (funcionan, 3199 veces/frame).
+- FIX CLAVE: Vdp2ReadByte devolvia 0 SIEMPRE -> ahora devuelve HCNT/VCNT/TVSTAT por bytes
+  (el gun lee el HV counter por BYTES). Con esto el juego LEE la posicion (303 lecturas vs 0).
+- Cursor violeta en XFB (zgx_DrawGunCursorXFB en svi.c) - se ve donde apunta el IR.
+- Mapeo IR calibrado con 3 puntos reales: X:20-676 (ancho 656), Y:0-501 -> Saturn 320x224.
+- WPAD_SetVRes 704x528. Escala/offset del latch ajustable (zgx_gun_hscale/hoff/vscale/voff en vdp2.c).
+- Herramientas debug: 1+2 del Wiimote = dump log; logs de IR crudo, HCNT/VCNT enviado y leido, INTBACK.
+
+PENDIENTE (el ultimo 10%, esquivo):
+- El disparo NO cae donde apunta el cursor. Las balas NO cuentan (cada disparo cuenta como
+  OFF-SCREEN = recarga instantanea). Ajustar escala/offset del HCNT/VCNT NO cambia nada.
+- Hipotesis: el on/off-screen se decide por el flag del latch en TVSTAT (0x200), no por la
+  posicion. O timing del latch (lo ponemos en VBlankOUT, el juego lee en otro momento).
+- Media player del BIOS reacciona al puntero pero marca fijo (mala referencia).
+
+REFERENCIA: galagasux (gbatemp) compilo NUESTRO fork y lo hizo funcionar PERFECTO con todos
+los juegos de disparo (v10 de sus intentos, uso tecnicas de WiiStation/WiiSX GunCon/Justifier,
+remapeo a 704, off-screen reload). Contactado por DM. Su codigo cerraria esto rapido.
