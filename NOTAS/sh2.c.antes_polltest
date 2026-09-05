@@ -930,7 +930,7 @@ u8 sh2_Read8(u32 addr)
 		if (sh_ctx->flags & SH2_FLAG_SLAVE) {
 			u32 ca = addr & 0x0FFFFFFF;
 			if (ca == sh_ctx->poll_addr && sh_ctx->pc == sh_ctx->poll_pc) {
-				if (++sh_ctx->poll_cnt >= 999999) { sh_ctx->poll_state = 1; sh_ctx->cycles = 0; }
+				if (++sh_ctx->poll_cnt >= 16) { sh_ctx->poll_state = 1; sh_ctx->cycles = 0; }
 			} else { sh_ctx->poll_addr = ca; sh_ctx->poll_pc = sh_ctx->pc; sh_ctx->poll_cnt = 0; }
 		}
 		return wram[(addr | ((addr >> 6) & 0x100000)) & 0x1FFFFF];
@@ -945,7 +945,7 @@ u8 sh2_Read8(u32 addr)
 				u32 ca = addr & 0x0FFFFFFF;
 				if ((ca & 0xFF000000) == 0x06000000) {
 					if (ca == sh_ctx->poll_addr && sh_ctx->pc == sh_ctx->poll_pc) {
-						if (++sh_ctx->poll_cnt >= 999999) { sh_ctx->poll_state = 1; sh_ctx->cycles = 0; }
+						if (++sh_ctx->poll_cnt >= 16) { sh_ctx->poll_state = 1; sh_ctx->cycles = 0; }
 					} else { sh_ctx->poll_addr = ca; sh_ctx->poll_pc = sh_ctx->pc; sh_ctx->poll_cnt = 0; }
 				}
 			}

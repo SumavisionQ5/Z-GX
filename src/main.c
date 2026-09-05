@@ -169,8 +169,9 @@ int opt_cursor = 0;       // opcion seleccionada en el menu
 int opt_scanline = 0;     // 1 = filtro scanline ON
 int opt_lightgun = 0;     // 1 = lightgun ON
 int opt_bezel = 0;        // 1 = bezel (marco) ON
+int opt_quickboot = 1;    // 1 = QuickBoot ON (salta BIOS), 0 = BIOS real completo
 int opt_fps = 1;          // 1 = mostrar FPS (default ON, como estaban fijos antes)
-#define OPT_COUNT 8        // cantidad de opciones en el menu
+#define OPT_COUNT 9        // cantidad de opciones en el menu
 char g_device_path[16] = "sd:/"; //ruta del dispositivo activo (sd:/ o usb:/), para 240p y covers
 static s32 selectedcart = 7;
 static int bioswith = 0;
@@ -312,6 +313,7 @@ void options_Save(void)
 		fprintf(f, "scanline=%d\n", opt_scanline);
 		fprintf(f, "bezel=%d\n", opt_bezel);
 		fprintf(f, "lightgun=%d\n", opt_lightgun);
+	fprintf(f, "quickboot=%d\n", opt_quickboot);
 		fclose(f);
 	}
 }
@@ -329,6 +331,7 @@ void options_Load(void)
 			else if (sscanf(line, "scanline=%d", &v) == 1) opt_scanline = v;
 			else if (sscanf(line, "bezel=%d", &v) == 1) opt_bezel = v;
 			else if (sscanf(line, "lightgun=%d", &v) == 1) opt_lightgun = v;
+		else if (sscanf(line, "quickboot=%d", &v) == 1) opt_quickboot = v;
 		}
 		fclose(f);
 	}
@@ -344,7 +347,8 @@ static void opt_GetLine(int idx, char *buf)
 		case 4: sprintf(buf, "Scanlines:   %s", opt_scanline ? "ON" : "OFF"); break;
 		case 5: sprintf(buf, "Bezel:       %s", opt_bezel ? "ON" : "OFF"); break;
 		case 6: sprintf(buf, "Lightgun:    %s", opt_lightgun ? "ON" : "OFF"); break;
-		case 7: sprintf(buf, "BIOS:        (soon)"); break;
+		case 7: sprintf(buf, "QuickBoot:   %s", opt_quickboot ? "ON" : "OFF"); break;
+		case 8: sprintf(buf, "BIOS:        (soon)"); break;
 	}
 }
 // Cambia el valor de la opcion seleccionada
@@ -362,7 +366,8 @@ static void opt_Toggle(int idx)
 		case 4: opt_scanline ^= 1; break;
 		case 5: opt_bezel ^= 1; break;
 		case 6: opt_lightgun ^= 1; break;
-		case 7: break; // BIOS placeholder
+		case 7: opt_quickboot ^= 1; break;
+		case 8: break; // BIOS placeholder
 	}
 	options_Save();
 }

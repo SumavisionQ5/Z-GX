@@ -216,7 +216,7 @@ int	YabauseInit(yabauseinit_struct *init)
 	YabauseResetNoLoad();
 
 	//NOTE: QuickLoad is disabled for now
-	yabsys.usequickload = 1;
+	{ extern int opt_quickboot; yabsys.usequickload = opt_quickboot; }
 	if (yabsys.usequickload) {
 		if (YabauseQuickLoadGame() != 0) {
 			YabauseResetNoLoad();
@@ -400,7 +400,7 @@ int YabauseEmulate(void) {
 			sh2_Exec(&msh2, sh2cycles);
 			osd_ProfAddTime(PROF_SH2M, gettime() - cycles_start);
 			cycles_start = gettime();
-			if (yabsys.IsSSH2Running && (!ssh2.poll_state || ssh2.iqr_count > 0)) { ssh2.poll_state = 0; sh2_Exec(&ssh2, sh2cycles); }
+			if (yabsys.IsSSH2Running) sh2_Exec(&ssh2, sh2cycles);
 			osd_ProfAddTime(PROF_SH2S, gettime() - cycles_start);
 
 #ifndef SCSP_PLUGIN
