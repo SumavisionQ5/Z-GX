@@ -89,3 +89,25 @@ El problema es la REGULARIDAD de la presentacion de frames (pipeline de video/bi
 no el streaming del CD. Descartado el CD timing. Revertido a 20000.
 Proxima vez: investigar el pipeline de presentacion del bitmap (SGX_Vdp2DrawBitmap)
 y como se sincroniza la actualizacion del frame de video con el VBlank.
+
+=== CF4 (piso/cielo verde Virtua Cop) - DIAGNOSTICO COMPLETO (Sep 5) ===
+RUTA REAL: el piso de VC es NBG1 CELDA (no bitmap) color_fmt 4 (32bpp).
+Pasa por SGX_Vdp2DrawCellSimple() case 4 (sgx_vdp2.c:462): usa GX_TF_RGBA8 SIN converter.
+El tile tiene TEXTURA (geometria OK) pero color VERDE porque GX lee el RGBA8 con su
+layout entrelazado (tiles 4x4, planos AR y GB separados) sobre datos LINEALES del Saturn
+(0x??RRGGBB). Los bytes de color quedan mezclados -> verde.
+
+INTENTOS QUE NO FUNCIONARON:
+- Conversion CF4 en SGX_Vdp2DrawBitmap: NO es la ruta (el piso es celda, no bitmap).
+- Cambiar case 4 a RGB5A3 + converter 16bpp: nada cambia (el converter 16bpp no reordena bien el 32bpp).
+- Conversion por CPU tile-por-tile: DESCARTADA, mataria el rendimiento (VC corre 60fps, caeria a 30 o menos).
+
+POR QUE ES DIFICIL: el RGBA8 de GX tiene layout de DOBLE PLANO (32 bytes AR + 32 bytes GB
+por tile 4x4), distinto a los formatos de 1 plano (4/8/16bpp) que el sistema de indirect
+texture (indtex.c __indtex4/8/16bppGen) sabe manejar. Una indirect texture 32bpp NO se
+deriva del 16bpp (no es "doble ancho") - requiere manejar los 2 planos. Rediseño grande
+del converter. Es el fix mas dificil del renderer.
+
+FIX REAL PENDIENTE: extender el sistema de indirect texture (indtex.c) para soportar el
+layout de doble plano de GX_TF_RGBA8, o encontrar otro formato GX que lea el 32bpp lineal
+del Saturn sin costo de CPU. El piso verde es JUGABLE (no impide jugar), baja prioridad.
