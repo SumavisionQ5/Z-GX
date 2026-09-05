@@ -661,7 +661,7 @@ int CoreExec()
 	else yabsys.flags &= ~SYS_FLAGS_SHOW_FPS;
 
 	WPAD_SetDataFormat(WPAD_CHAN_ALL,WPAD_FMT_BTNS_ACC_IR);
-	WPAD_SetVRes(WPAD_CHAN_ALL, 640, 480);
+	WPAD_SetVRes(WPAD_CHAN_ALL, 704, 528);
 
 	memset(&yinit, 0, sizeof(yabauseinit_struct));
 	//yinit.percoretype = PERCORE_WIICLASSIC;

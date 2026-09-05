@@ -312,8 +312,10 @@ void SVI_ClearFrame(void)
 //FIX vsync: contador de retrazos. Antes SVI_SwapBuffers esperaba un retrace
 //entero si el frame tardaba <16ms, perdiendo un ciclo completo (Daytona 44fps
 //con solo ~14ms de trabajo). Ahora solo espera si aun no paso ningun retrace.
+void zgx_DrawGunCursorXFB(void);
 void SVI_SwapBuffers(u32 wait_vsync)
 {
+	zgx_DrawGunCursorXFB();
 	(void)wait_vsync;
 	VIDEO_SetNextFramebuffer(xfb[fbsel]);
 	VIDEO_Flush();
@@ -323,4 +325,25 @@ void SVI_SwapBuffers(u32 wait_vsync)
 	}
 	svi_retrace = 0;
 	fbsel ^= 1;
+}
+
+// LIGHTGUN: dibujar cursor en el XFB (704 ancho, YUY2) en la posicion del IR
+void zgx_DrawGunCursorXFB(void) {
+	extern int opt_lightgun;
+	extern s16 zgx_lgun_x, zgx_lgun_y; extern u8 zgx_lgun_active;
+	if (!opt_lightgun || !zgx_lgun_active) return;
+	if (!xfb[fbsel]) return;
+	// zgx_lgun_x 0-320 -> 0-704 ; zgx_lgun_y 0-224 -> 0-480
+	int cx = (zgx_lgun_x * 704) / 320;
+	int cy = (zgx_lgun_y * 480) / 224;
+	u32 w = 704;
+	u16 *fb = xfb[fbsel];
+	// amarillo en YUY2 aprox: Y=210 U=16 V=146 -> pixel pair
+	for (int dy = -3; dy <= 3; dy++) {
+		for (int dx = -3; dx <= 3; dx++) {
+			int px = cx + dx, py = cy + dy;
+			if (px < 0 || px >= (int)w || py < 0 || py >= 480) continue;
+			fb[py * (w) + px] = 0xD2A0; // Y alto + croma (amarillento)
+		}
+	}
 }

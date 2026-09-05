@@ -255,6 +255,7 @@ typedef struct PerPad_t {
 	s16 sx;
 	s16 sy;
 	u8 is_gun;
+	u32 gun_btn;
 	s16 gun_x;
 	s16 gun_y;
 } PerPad;

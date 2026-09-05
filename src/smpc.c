@@ -278,6 +278,7 @@ static void SmpcINTBACKPeripheral(void) {
   */
 
 	//u32 data_sent = (per_data.data_sent ? 0 : per_data.data_size);
+	{ extern u32 zgx_gun_ddr[8]; zgx_gun_ddr[4] = (per_data.data[0]<<16)|(per_data.data[1]<<8)|per_data.data[2]; zgx_gun_ddr[5] = (per_data.data[3]<<16)|(per_data.data[4]<<8)|per_data.data[5]; zgx_gun_ddr[6] = per_data.data_size; }
 	for (u32 i = 0; i < per_data.data_size; ++i) {
 		SMPC_REG_OREG(i) = per_data.data[i];
 	}
@@ -586,6 +587,7 @@ void FASTCALL SmpcWriteByte(u32 addr, u8 val) {
 			// FIX ME (should support other peripherals)
 			//SMPC_REG_DDR1 & 0x7F;
 			switch (SMPC_REG_DDR1 & 0x7F) { // Which Control Method do we use?
+	{ extern u32 zgx_gun_ddr[8], zgx_gun_lastval; zgx_gun_ddr[(SMPC_REG_DDR1 >> 5) & 7]++; zgx_gun_lastval = SMPC_REG_DDR1; }
 				case 0x00: // Modo directo: si es gun y val 0x7F, devolver data[2]
 					if (per_data.data[1] == PERGUN && (val & 0x7F) == 0x7F)
 						SMPC_REG_PDR1 = per_data.data[2];
@@ -594,15 +596,24 @@ void FASTCALL SmpcWriteByte(u32 addr, u8 val) {
 					SMPC_REG_PDR1 = do_th_mode(val);
 					break;
 				case 0x60:
-
-					switch ((val >> 5) & 0x3) {
-						//XXX: use actual values from peripheral.c
-						case 0: val = (val & 0x80) | 0x10 | ((per_data.data[3] >> 4) & 0xF);	break;
-						case 1: val = (val & 0x80) | 0x10 | ((per_data.data[2] >> 4) & 0xF);	break;
-						case 2: val = (val & 0x80) | 0x10 | (per_data.data[2] & 0xF);			break;
-						case 3: val = (val & 0x80) | 0x14 | (per_data.data[3] & 0xF);			break;
+					if (per_data.data[1] == PERGUN) {
+						// TH+TR control del GUN: leer botones/pos en 4 pasos (data[2],data[3])
+						switch (val & 0x60) {
+							case 0x60: val = (val & 0x80) | 0x14 | (per_data.data[3] & 0x8); break;
+							case 0x20: val = (val & 0x80) | 0x10 | ((per_data.data[2] >> 4) & 0xF); break;
+							case 0x40: val = (val & 0x80) | 0x10 | (per_data.data[2] & 0xF); break;
+							case 0x00: val = (val & 0x80) | 0x10 | ((per_data.data[3] >> 4) & 0xF); break;
+						}
+						SMPC_REG_PDR1 = val;
+					} else {
+						switch ((val >> 5) & 0x3) {
+							case 0: val = (val & 0x80) | 0x10 | ((per_data.data[3] >> 4) & 0xF);   break;
+							case 1: val = (val & 0x80) | 0x10 | ((per_data.data[2] >> 4) & 0xF);   break;
+							case 2: val = (val & 0x80) | 0x10 | (per_data.data[2] & 0xF);          break;
+							case 3: val = (val & 0x80) | 0x14 | (per_data.data[3] & 0xF);          break;
+						}
+						SMPC_REG_PDR1 = val;
 					}
-					SMPC_REG_PDR1 = val;
 					break;
 				default:
 					SMPCLOG("smpc\t: Peripheral Unknown Control Method not implemented\n");
@@ -628,3 +639,10 @@ void FASTCALL SmpcWriteLong(USED_IF_SMPC_DEBUG u32 addr, UNUSED u32 val)
 
 //////////////////////////////////////////////////////////////////////////////
 
+
+// LIGHTGUN: exponer el registro EXLE (habilita el latch externo del gun) al VDP
+u16 zgx_smpc_exle(void) { return SMPC_REG_EXLE; }
+
+// Diagnostico lightgun: contar que modos DDR pide el juego
+u32 zgx_gun_ddr[8] = {0};
+u32 zgx_gun_lastval = 0;

@@ -276,3 +276,16 @@ void osd_ProfDraw(void)
 	GX_SetDispCopySrc(0, 0, (40*8), y+12);
 	SVI_CopyXFB(32, 320);
 }
+
+// LIGHTGUN: dibujar cursor (+) en la posicion del IR del gun
+void zgx_DrawGunCursor(void) {
+	extern int opt_lightgun;
+	if (!opt_lightgun) return;
+	extern s16 zgx_lgun_x, zgx_lgun_y; extern u8 zgx_lgun_active;
+	// TEST: dibujar siempre en el centro fijo para confirmar que se ve
+	osd_MsgAdd(320, 240, 0xFFFF00FF, "X");
+	// y en la posicion del IR
+	u32 sx = (u32)(zgx_lgun_x * 2);
+	u32 sy = (u32)(zgx_lgun_y * 2);
+	osd_MsgAdd(sx, sy, 0xFF0000FF, "O");
+}

@@ -378,7 +378,6 @@ void Vdp2VBlankOUT(void)
 		FPSDisplay();
 	}
 	{ extern u32 _prof_on; if (_prof_on) osd_ProfDraw(); } // overlay abajo, toggle R+Z
-	{ extern void zgx_DrawGunCursor(void); zgx_DrawGunCursor(); } // cursor lightgun
 	SGX_Vdp1SwapFramebuffer();
 	SVI_SwapBuffers(0);
 
@@ -390,22 +389,8 @@ void Vdp2VBlankOUT(void)
 	if ((Vdp1Regs->FBCR & 2) && (Vdp1Regs->TVMR & 8)) {
 		Vdp1External.manualerase = 1;
 	}
-   // LIGHTGUN: latch externo de la posicion del gun (portado de Yabause vdp2.c:522)
-   { extern u32 zgx_gun_ddr[8]; if (Vdp2Regs->EXTEN & 0x200) zgx_gun_ddr[7]++; }
-   if (Vdp2Regs->EXTEN & 0x200) {
-      extern u16 zgx_smpc_exle(void);
-      extern int zgx_gun_pos(int*, int*);
-      int gx, gy;
-      { extern u32 zgx_gun_lastval; if (zgx_smpc_exle() & 0x1) zgx_gun_lastval |= 0x100; }
-      if ((zgx_smpc_exle() & 0x1) && zgx_gun_pos(&gx, &gy)) {
-         // gx 0-320, gy 0-224. Escala/offset AJUSTABLE en vivo (calibracion).
-         extern int zgx_gun_hscale, zgx_gun_hoff, zgx_gun_vscale, zgx_gun_voff;
-         Vdp2Regs->HCNT = (gx * zgx_gun_hscale / 100) + zgx_gun_hoff;
-         Vdp2Regs->VCNT = (gy * zgx_gun_vscale / 100) + zgx_gun_voff;
-        { extern u32 zgx_gun_ddr[8]; zgx_gun_ddr[3] = (Vdp2Regs->HCNT << 16) | Vdp2Regs->VCNT; }
-         Vdp2Regs->TVSTAT |= 0x200;
-      }
-      }
+
+
    ScuSendVBlankOUT();
 }
 
@@ -438,7 +423,7 @@ u16 FASTCALL Vdp2ReadWord(u32 addr) {
          return Vdp2Regs->EXTEN;
       case 0x004:
          // Clear External latch and sync flags
-         Vdp2Regs->TVSTAT &= 0xFDFF; /* no limpiar bit latch 0x200 */
+         Vdp2Regs->TVSTAT &= 0xFCFF;
 
          // if TVMD's DISP bit is cleared, TVSTAT's VBLANK bit is always set
          if (Vdp2Regs->TVMD & 0x8000)
@@ -940,6 +925,3 @@ void FASTCALL Vdp2WriteLong(u32 addr, u32 val) {
 //////////////////////////////////////////////////////////////////////////////
 
 
-
-// LIGHTGUN: parametros de calibracion ajustables en vivo (escala en %, offset en unidades)
-int zgx_gun_hscale = 100, zgx_gun_hoff = 0, zgx_gun_vscale = 100, zgx_gun_voff = 0;
