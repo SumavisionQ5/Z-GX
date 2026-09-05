@@ -230,10 +230,6 @@ typedef struct SH2_tag
 	u32 address_arr[0x100];		/*Address Array*/
 	u8 on_chip[0x200];			/*On-chip peripheral modules*/
 	u8 cache[0x1000];			/*Data Cache Array*/
-	u32 poll_addr;   /* poll detection: dir que este SH2 pollea */
-	u32 poll_cnt;    /* lecturas repetidas */
-	u32 poll_state;  /* 1 = parado esperando escritura */
-	u32 poll_pc;     /* PC del slave en el poll */
 } SH2;
 
 

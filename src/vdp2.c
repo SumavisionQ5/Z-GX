@@ -413,14 +413,16 @@ void Vdp2VBlankOUT(void)
 
 u8 FASTCALL Vdp2ReadByte(u32 addr) {
    addr &= 0x1FF;
-   // El gun lee el HV counter por bytes. Devolver los bytes reales de HCNT/VCNT.
-   switch (addr) {
-      case 0x008: return (Vdp2Regs->HCNT >> 8) & 0xFF; // HCNT byte alto
-      case 0x009: return Vdp2Regs->HCNT & 0xFF;         // HCNT byte bajo
-      case 0x00A: return (Vdp2Regs->VCNT >> 8) & 0xFF; // VCNT byte alto
-      case 0x00B: return Vdp2Regs->VCNT & 0xFF;         // VCNT byte bajo
-      case 0x004: return (Vdp2Regs->TVSTAT >> 8) & 0xFF; // TVSTAT alto
-      case 0x005: return Vdp2Regs->TVSTAT & 0xFF;        // TVSTAT bajo
+   // Solo con lightgun ON: el gun lee el HV counter por bytes. Sin lightgun, comportamiento original (0).
+   { extern int opt_lightgun;
+     if (opt_lightgun) switch (addr) {
+        case 0x008: return (Vdp2Regs->HCNT >> 8) & 0xFF;
+        case 0x009: return Vdp2Regs->HCNT & 0xFF;
+        case 0x00A: return (Vdp2Regs->VCNT >> 8) & 0xFF;
+        case 0x00B: return Vdp2Regs->VCNT & 0xFF;
+        case 0x004: return (Vdp2Regs->TVSTAT >> 8) & 0xFF;
+        case 0x005: return Vdp2Regs->TVSTAT & 0xFF;
+     }
    }
    return 0;
 }
