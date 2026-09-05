@@ -1427,6 +1427,7 @@ void zgx_DumpLog(void) {
 		fprintf(f, "%3u: %08X\n", i - start, zgx_pclog[i & (ZGX_LOG_SIZE-1)]);
 	}
 	fprintf(f, "MPC=%08X SPC=%08X MSR=%08X\n", msh2.pc, ssh2.pc, msh2.sr);
+	{ extern u32 zgx_spr_spctl, zgx_spr_pri, zgx_spr_type; fprintf(f, "SPRITE: SPCTL=%04X type=%u prioridades(PRISA-D)=%04X\n", zgx_spr_spctl, zgx_spr_type, zgx_spr_pri); }
 	fclose(f);
 }
 

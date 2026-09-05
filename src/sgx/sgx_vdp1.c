@@ -237,6 +237,7 @@ static void __Vdp1LoadPrCcTlut(void)
 	pri_arr[5] = ((Vdp2Regs->PRISC >> 8) & 0x7) << 4;
 	pri_arr[6] = (Vdp2Regs->PRISD & 0x7) << 4;
 	pri_arr[7] = ((Vdp2Regs->PRISD >> 8) & 0x7) << 4;
+	{ extern u32 zgx_spr_spctl, zgx_spr_pri, zgx_spr_type; zgx_spr_spctl = Vdp2Regs->SPCTL; zgx_spr_type = vdp1pix.type; zgx_spr_pri = (Vdp2Regs->PRISA & 0x7) | ((Vdp2Regs->PRISB & 0x7)<<4) | ((Vdp2Regs->PRISC & 0x7)<<8) | ((Vdp2Regs->PRISD & 0x7)<<12); }
 	cc_arr[0] = (Vdp2Regs->CCRSA & 0x1F) << 3;
 	cc_arr[1] = ((Vdp2Regs->CCRSA >> 8) & 0x1F) << 3;
 	cc_arr[2] = (Vdp2Regs->CCRSB & 0x1F) << 3;
@@ -1002,3 +1003,6 @@ void SGX_Vdp1LocalCoord(void)
 	local_coordy = (f32) ((s16)vdp1cmd->YA);
 	SGX_SetVtxOffset(-local_coordx, -local_coordy);
 }
+
+// Diagnostico Astra: valores de prioridad/tipo de sprite
+u32 zgx_spr_spctl = 0, zgx_spr_pri = 0, zgx_spr_type = 0;
