@@ -33,6 +33,7 @@ SH2 msh2;
 SH2 ssh2;
 
 SH2 *sh_ctx;
+u32 _hle_calls=0, _hle_idx=0, _hle_pc=0, _hle_maxidx=0;
 
 #define write8(ptr, x)		(*((u8*)(ptr)) = (x))
 #define write16(ptr, x)		(*((u16*)(ptr)) = (x))
@@ -169,6 +170,8 @@ void sh2_Exec(SH2 *sh, u32 cycles)
 {
 	//Update context
 	sh_ctx = sh;
+	if (sh == &msh2) { extern void zgx_LogMasterPC(u32); zgx_LogMasterPC(sh->pc); }
+	if (sh == &ssh2) { extern void zgx_LogSlavePC(u32); zgx_LogSlavePC(sh->pc); }
 	//if (!(sh->flags & SH2_FLAG_SLEEPING)) {
 	sh2_DrcExec(sh, cycles);
 	cycles += sh->cycles;
@@ -205,11 +208,12 @@ void sh2_SetInterrupt(SH2 *sh, u32 vec, u32 level)
 	sh->iqr_count++;
 }
 
+u32 _m_irqproc=0;
 void sh2_HandleInterrupt(SH2 *sh)
 {
 	if (sh->iqr_count) {
 		u32 level = SH2_INTERRUPT_LEVEL(sh->iqr[sh->iqr_count-1]);
-		if (level > SH2_SR_I(sh->sr)) {
+		if (level > SH2_SR_I(sh->sr) || level >= 15) { /* nivel 15 (max) se acepta aunque iguale la mascara */
 			u32 vec = SH2_INTERRUPT_VEC(sh->iqr[sh->iqr_count-1]);
 			sh2_Write32(sh->r[15] - 4, sh->sr);
 			sh2_Write32(sh->r[15] - 8, sh->pc);
@@ -217,7 +221,7 @@ void sh2_HandleInterrupt(SH2 *sh)
 			sh->sr = SH2_SR_SET_I(sh->sr, level);
 			sh->pc = sh2_Read32(sh->vbr + (vec << 2));
 			--sh->iqr_count;
-			SH2_FLAG_CLR(sh, SH2_FLAG_IDLE | SH2_FLAG_SLEEPING);
+			SH2_FLAG_CLR(sh, SH2_FLAG_IDLE | SH2_FLAG_SLEEPING); if(sh==&msh2)_m_irqproc++;
 		}
 	}
 }
@@ -920,17 +924,16 @@ void sh2_OnchipWrite32(u32 addr, u32 val)
 
 u8 sh2_Read8(u32 addr)
 {
-	if ((addr & 0xFE000000) == 0x06000000) { extern u8 *wram; return wram[(addr | ((addr >> 6) & 0x100000)) & 0x1FFFFF]; }
+	if ((addr & 0xFE000000) == 0x06000000) {
+		extern u8 *wram;
+		return wram[(addr | ((addr >> 6) & 0x100000)) & 0x1FFFFF];
+	}
 	if ((addr & 0xFFF00000) == 0x00200000) { extern u8 *wram; return wram[addr & 0xFFFFF]; }
 	switch(addr >> 29) {
 		case 0x1:	//Cache-through area
 		case 0x5:	sh_ctx->cycles += mem_CyclesR(addr);
 		case 0x0:	//Cache area
 			return mem_Read8(addr & 0x0FFFFFFF);
-			//addr &= 0x0FFFFFFF;
-			//return mem_read8_arr[(addr >> 19) & 0xFF](addr);
-		case 0x3:	//Adress Array, read/write space
-			return 0;
 		case 0x2:	//Associative purge space
 			return 0x23;
 		case 0x4:	//Data Array, read/write space	(DataCache)
@@ -995,10 +998,10 @@ u32 sh2_Read32(u32 addr)
 	}
 	return 0xFFFFFFFF;
 }
-
-
 void sh2_Write8(u32 addr, u8 val)
 {
+	{ extern u32 zgx_sem_mw, zgx_sem_sw, zgx_sem_lastw, zgx_sem_mw0; if ((addr & 0x0FFFFFFF) == 0x060CD7D0) { if (sh_ctx->flags & SH2_FLAG_SLAVE) zgx_sem_sw++; else { zgx_sem_mw++; if(val==0) zgx_sem_mw0++; } zgx_sem_lastw = val; } }
+	{ extern u32 zgx_sem_addr_m, zgx_sem_addr_s; if ((addr & 0x0FFFFFFF) == 0x060CD7D0) { if (sh_ctx->flags & SH2_FLAG_SLAVE) zgx_sem_addr_s = addr; else zgx_sem_addr_m = addr; } }
 	drc_CheckWrite(addr);
 	if ((addr & 0xFE000000) == 0x06000000) { extern u8 *wram; wram[(addr | ((addr >> 6) & 0x100000)) & 0x1FFFFF] = val; return; }
 	if ((addr & 0xFFF00000) == 0x00200000) { extern u8 *wram; wram[addr & 0xFFFFF] = val; return; }
@@ -1025,6 +1028,7 @@ void sh2_Write8(u32 addr, u8 val)
 void sh2_Write16(u32 addr, u16 val)
 {
 	drc_CheckWrite(addr);
+	{ extern u32 zgx_slave_vdp1, zgx_slave_vdp2; { extern u32 zgx_slave_vdp1, zgx_slave_vdp2, zgx_mst_vdp1, zgx_mst_vdp2; u32 a=addr&0x0FFFFFFF; int sl=(sh_ctx->flags & SH2_FLAG_SLAVE)?1:0; if((a&0x0FF00000)==0x05C00000){ if(sl)zgx_slave_vdp1++; else zgx_mst_vdp1++; } else if((a&0x0FF00000)==0x05E00000){ if(sl)zgx_slave_vdp2++; else zgx_mst_vdp2++; } } }
 	if ((addr & 0xFE000000) == 0x06000000) { extern u8 *wram; *((u16*)(wram + ((addr | ((addr >> 6) & 0x100000)) & 0x1FFFFF))) = val; return; }
 	if ((addr & 0xFFF00000) == 0x00200000) { extern u8 *wram; *((u16*)(wram + (addr & 0xFFFFF))) = val; return; }
 	switch(addr >> 29) {
@@ -1072,6 +1076,149 @@ void sh2_Write32(u32 addr, u32 val)
 	}
 }
 
+
+// ===== BIOS HLE: handler de funciones del BIOS (semaforos, backup RAM) =====
+// Handler completo de instruccion ilegal (para el dynarec en modo HLE).
+// Chequea si el PC es una funcion del BIOS (bios_HandleFunc). Si la maneja, listo.
+// Si no, hace el exception estandar (push SR y PC, salta al vector).
+void sh2_IllegalFull(u32 pc)
+{
+	SH2 *sh = sh_ctx;
+	extern int zgx_hle_bios;
+	sh->pc = pc;
+	// Modo HLE: chequear si es una funcion del BIOS
+	if (zgx_hle_bios && pc >= 0x200 && pc <= 0x4FF) {
+		extern int bios_HandleFunc(void);
+		if (bios_HandleFunc()) return; // manejada, PC ya ajustado
+	}
+	// Exception estandar de instruccion ilegal (vector 4)
+	sh2_Write32(sh->r[15] - 4, sh->sr);
+	sh2_Write32(sh->r[15] - 8, pc + 2);
+	sh->r[15] -= 8;
+	sh->pc = sh2_Read32(sh->vbr + (4 << 2));
+}
+
+u32 scumasklist[0x20], sh2masklist[0x20];
+int bios_HandleFunc(void)
+{
+	SH2 *sh = sh_ctx;
+	u32 idx = (sh->pc - 0x200) >> 2; // indice como yabasanshiro
+	{ extern u32 _hle_calls, _hle_idx, _hle_pc; _hle_calls++; _hle_idx = idx; _hle_pc = sh->pc; if(idx > _hle_maxidx) _hle_maxidx = idx; }
+	switch (idx) {
+		case 0x4C: { // 0x06000330 BiosGetSemaphore
+			u8 temp = sh2_Read8(0x06000B00 + sh->r[4]);
+			sh->r[0] = (temp == 0) ? 1 : 0;
+			sh2_Write8(0x06000B00 + sh->r[4], temp | 0x80);
+			sh->cycles += 11; sh->pc = sh->pr; return 1;
+		}
+		case 0x4D: { // 0x06000334 BiosClearSemaphore
+			sh2_Write8(0x06000B00 + sh->r[4], 0);
+			sh->cycles += 5; sh->pc = sh->pr; return 1;
+		}
+		case 0x56: { // 0x06000358 BiosBUPInit
+			u32 r5 = sh->r[5];
+			sh2_Write32(0x06000354, r5);
+			int k; for (k = 0; k < 0x2C; k += 4)
+				sh2_Write32(r5 + k, 0x00000380 + k);
+			sh->pc = sh->pr; return 1;
+		}
+		case 0x04: { // 0x06000210 PowerOnMemoryClear (stub: no-op)
+			sh->pc = sh->pr; return 1;
+		}
+		case 0x20: { // 0x06000280 ChangeScuInterruptPriority
+			int i;
+			for (i = 0; i < 0x20; i++) {
+				scumasklist[i] = sh2_Read32(sh->r[4] + (i << 2));
+				sh2masklist[i] = (scumasklist[i] >> 16);
+				if (scumasklist[i] & 0x8000) scumasklist[i] |= 0xFFFF0000;
+				else scumasklist[i] &= 0x0000FFFF;
+			}
+			sh->cycles += 186; sh->pc = sh->pr; return 1;
+		}
+		case 0x40: { // 0x06000300 SetScuInterrupt
+			if (sh->r[5] == 0) { sh2_Write32(0x06000900 + (sh->r[4] << 2), 0x06000610); sh->cycles += 8; }
+			else { sh2_Write32(0x06000900 + (sh->r[4] << 2), sh->r[5]); sh->cycles += 9; }
+			sh->pc = sh->pr; return 1;
+		}
+		case 0x44: { // 0x06000310 SetSh2Interrupt
+			if (sh->r[5] == 0) { sh2_Write32(sh->vbr + (sh->r[4] << 2), 0x06000600); sh->cycles += 8; }
+			else { sh2_Write32(sh->vbr + (sh->r[4] << 2), sh->r[5]); sh->cycles += 9; }
+			sh->pc = sh->pr; return 1;
+		}
+		case 0x48: { // 0x06000320 ChangeSystemClock (stub)
+			sh->pc = sh->pr; return 1;
+		}
+		case 0x50: { // 0x06000340 SetScuInterruptMask
+			if (sh_ctx != &ssh2) {
+				sh2_Write32(0x06000348, sh->r[4]);
+				sh2_Write32(0x25FE00A0, sh->r[4]);
+				sh2_Write32(0x25FE00A4, sh->r[4]);
+			}
+			if (!(sh->r[4] & 0x8000)) sh2_Write32(0x25FE00A8, 1);
+			sh->cycles += 17; sh->pc = sh->pr; return 1;
+		}
+		case 0x51: { // 0x06000344 ChangeScuInterruptMask (stub-ish, igual que SetMask)
+			if (sh_ctx != &ssh2) {
+				sh2_Write32(0x06000348, sh->r[4]);
+				sh2_Write32(0x25FE00A0, sh->r[4]);
+			}
+			if (!(sh->r[4] & 0x8000)) sh2_Write32(0x25FE00A8, 1);
+			sh->cycles += 17; sh->pc = sh->pr; return 1;
+		}
+		case 0x27: case 0x37: { // CDINIT2/CDINIT1 (stub)
+			sh->pc = sh->pr; return 1;
+		}
+		case 0x80: case 0x81: case 0x82: case 0x83:
+		case 0x84: case 0x85: case 0x86: case 0x87:
+		case 0x88: case 0x89: case 0x8A: case 0x8B:
+		case 0x8C: case 0x8D: case 0x90: case 0x91:
+		case 0x92: case 0x93: case 0x94: case 0x95:
+		case 0x96: case 0x97: case 0x98: case 0x99:
+		case 0x9A: case 0x9B: case 0x9C: case 0x9D:
+		case 0x9E: case 0x9F: { // BiosHandleScuInterrupt
+			int vector = (sh->pc - 0x300) >> 2;
+			sh->r[15] -= 4; sh2_Write32(sh->r[15], sh->r[0]);
+			sh->r[15] -= 4; sh2_Write32(sh->r[15], sh->r[1]);
+			sh->r[15] -= 4; sh2_Write32(sh->r[15], sh->r[2]);
+			sh->r[15] -= 4; sh2_Write32(sh->r[15], sh->r[3]);
+			sh->r[15] -= 4; sh2_Write32(sh->r[15], sh2_Read32(0x06000348));
+			sh->r[15] -= 4; sh2_Write32(sh->r[15], sh->r[4]);
+			sh->r[15] -= 4; sh2_Write32(sh->r[15], sh->r[5]);
+			sh->r[15] -= 4; sh2_Write32(sh->r[15], sh->r[6]);
+			sh->r[15] -= 4; sh2_Write32(sh->r[15], sh->r[7]);
+			sh->r[15] -= 4; sh2_Write32(sh->r[15], sh->pr);
+			sh->r[15] -= 4; sh2_Write32(sh->r[15], sh->gbr);
+			sh->sr = (u32) sh2masklist[vector - 0x40];
+			sh2_Write32(0x06000348, sh2_Read32(0x06000348) | scumasklist[vector - 0x40]);
+			sh2_Write32(0x25FE00A0, sh2_Read32(0x06000348) | scumasklist[vector - 0x40]);
+			sh->pr = 0x00000480;
+			sh->pc = sh2_Read32(0x06000900 + (vector << 2));
+			sh->cycles += 200; return 1;
+		}
+		case 0xA0: { // BiosHandleScuInterruptReturn
+			u32 oldmask;
+			sh->gbr = sh2_Read32(sh->r[15]); sh->r[15] += 4;
+			sh->pr = sh2_Read32(sh->r[15]); sh->r[15] += 4;
+			sh->r[7] = sh2_Read32(sh->r[15]); sh->r[15] += 4;
+			sh->r[6] = sh2_Read32(sh->r[15]); sh->r[15] += 4;
+			sh->r[5] = sh2_Read32(sh->r[15]); sh->r[15] += 4;
+			sh->r[4] = sh2_Read32(sh->r[15]); sh->r[15] += 4;
+			sh->sr = 0xF0;
+			oldmask = sh2_Read32(sh->r[15]);
+			sh2_Write32(0x06000348, oldmask);
+			sh2_Write32(0x25FE00A0, oldmask);
+			sh->r[15] += 4;
+			sh->r[3] = sh2_Read32(sh->r[15]); sh->r[15] += 4;
+			sh->r[2] = sh2_Read32(sh->r[15]); sh->r[15] += 4;
+			sh->r[1] = sh2_Read32(sh->r[15]); sh->r[15] += 4;
+			sh->r[0] = sh2_Read32(sh->r[15]); sh->r[15] += 4;
+			sh->pc = sh2_Read32(sh->r[15]); sh->r[15] += 4;
+			sh->sr = sh2_Read32(sh->r[15]) & 0x000003F3; sh->r[15] += 4;
+			sh->cycles += 200; return 1;
+		}
+	}
+	sh->pc = sh->pr; return 0;
+}
 
 u16* sh2_GetPCAddr(u32 pc)
 {
@@ -1122,6 +1269,22 @@ void sh2_MSH2InputCaptureWrite16(u32 addr, u16 data)
 	if (OCR_TIER & 0x80) {
 		sh2_SetInterrupt(&msh2, (OCR_VCRC >> 8) & 0x7F, (OCR_IPRB >> 8) & 0xF);
 	}
+	// Wake + sync tipo Kronos: si el master esta en SLEEP (0x001B) saltarlo, y
+	// sincronizar sus ciclos a los del SH2 que escribe (sh_ctx). Ver NOTAS_BUG_NEGRO.md
+	if (mem_Read16(msh2.pc & 0x0FFFFFFF) == 0x001B) msh2.pc += 2;
+	{
+		static int _ic_depth_m = 0;
+		if (_ic_depth_m < 4 && sh_ctx) {
+			int syncCycle = sh_ctx->cycles - msh2.cycles;
+			if (syncCycle > 0) {
+				_ic_depth_m++;
+				SH2 *_save = sh_ctx;
+				sh2_Exec(&msh2, syncCycle);
+				sh_ctx = _save;
+				_ic_depth_m--;
+			}
+		}
+	}
 }
 
 void sh2_SSH2InputCaptureWrite16(u32 addr, u16 data)
@@ -1132,16 +1295,20 @@ void sh2_SSH2InputCaptureWrite16(u32 addr, u16 data)
 	if (OCR_TIER & 0x80) {
 		sh2_SetInterrupt(&ssh2, (OCR_VCRC >> 8) & 0x7F, (OCR_IPRB >> 8) & 0xF);
 	}
-	// Ejecutar el slave en el acto para que procese el ICF (patron Kronos)
-	// Ayuda a la sincronizacion master-slave. Ver NOTAS_BUG_NEGRO.md
+	// Wake + sync tipo Kronos: si el slave esta en SLEEP (0x001B) saltarlo, y
+	// sincronizar sus ciclos a los del SH2 que escribe (sh_ctx). Ver NOTAS_BUG_NEGRO.md
+	if (mem_Read16(ssh2.pc & 0x0FFFFFFF) == 0x001B) ssh2.pc += 2;
 	{
 		static int _ic_depth = 0;
-		if (_ic_depth < 4) {
-			_ic_depth++;
-			SH2 *_save = sh_ctx;
-			sh2_Exec(&ssh2, 128);
-			sh_ctx = _save;
-			_ic_depth--;
+		if (_ic_depth < 4 && sh_ctx) {
+			int syncCycle = sh_ctx->cycles - ssh2.cycles;
+			if (syncCycle > 0) {
+				_ic_depth++;
+				SH2 *_save = sh_ctx;
+				sh2_Exec(&ssh2, syncCycle);
+				sh_ctx = _save;
+				_ic_depth--;
+			}
 		}
 	}
 }
@@ -1180,3 +1347,160 @@ void __WriteSH2(void) {
 		__CloseSH2Writer();
 	}
 }
+unsigned zgx_msr(void) { return (unsigned) msh2.sr; }
+unsigned zgx_ssr(void) { return (unsigned) ssh2.sr; }
+unsigned zgx_miqr(void) { return (unsigned) msh2.iqr_count; }
+unsigned zgx_miqrlvl(void) { extern u32 SH2_INTERRUPT_LEVEL_fn(u32); if (msh2.iqr_count==0) return 0xFF; return (unsigned)((msh2.iqr[msh2.iqr_count-1] >> 8) & 0x1F); }
+unsigned zgx_miqrvec(void) { if (msh2.iqr_count==0) return 0xFF; return (unsigned)(msh2.iqr[msh2.iqr_count-1] & 0xFF); }
+unsigned zgx_spc2(void) { return (unsigned) ssh2.pc; }
+unsigned zgx_scyc(void) { return (unsigned) ssh2.cycles; }
+unsigned zgx_mpc2(void) { return (unsigned) msh2.pc; }
+unsigned zgx_mop(void) { return (unsigned) mem_Read16(msh2.pc & 0x0FFFFFFF); }
+unsigned zgx_sop(void) { return (unsigned) mem_Read16(ssh2.pc & 0x0FFFFFFF); }
+unsigned zgx_mop2(void) { return (unsigned) mem_Read16((msh2.pc & 0x0FFFFFFF) - 2); }
+unsigned zgx_sop2(void) { return (unsigned) mem_Read16((ssh2.pc & 0x0FFFFFFF) - 2); }
+unsigned zgx_m4(void) { return (unsigned) mem_Read16((msh2.pc & 0x0FFFFFFF) - 4); }
+unsigned zgx_m6(void) { return (unsigned) mem_Read16((msh2.pc & 0x0FFFFFFF) - 6); }
+unsigned zgx_m8(void) { return (unsigned) mem_Read16((msh2.pc & 0x0FFFFFFF) - 8); }
+unsigned zgx_mr0(void) { return (unsigned) msh2.r[0]; }
+unsigned zgx_s4(void) { return (unsigned) mem_Read16((ssh2.pc & 0x0FFFFFFF) - 4); }
+unsigned zgx_s6(void) { return (unsigned) mem_Read16((ssh2.pc & 0x0FFFFFFF) - 6); }
+unsigned zgx_s8(void) { return (unsigned) mem_Read16((ssh2.pc & 0x0FFFFFFF) - 8); }
+unsigned zgx_sr0(void) { return (unsigned) ssh2.r[0]; }
+unsigned zgx_sr2(void) { return (unsigned) ssh2.r[2]; }
+unsigned zgx_slcode(void) { return (unsigned) mem_Read32(0x20000200); }
+unsigned zgx_mflags(void) { return (unsigned) msh2.flags; }
+unsigned zgx_sflags(void) { return (unsigned) ssh2.flags; }
+unsigned zgx_mcyc(void) { return (unsigned) msh2.cycles; }
+u32 _m_gamemax = 0, _m_prev = 0, _m_beforeerr = 0, _m_after2b0 = 0, _m_r6 = 0, _m_from2b0 = 0;
+void zgx_track_master(u32 pc) {
+	if (pc >= 0x06002000 && pc < 0x06100000 && pc > _m_gamemax) _m_gamemax = pc;
+}
+unsigned zgx_mgamemax(void) { return _m_gamemax; }
+unsigned zgx_mirqproc(void) { extern u32 _m_irqproc; return _m_irqproc; }
+unsigned zgx_mA(void) { return (unsigned) mem_Read16((msh2.pc & 0x0FFFFFFF) - 10); }
+unsigned zgx_mC(void) { return (unsigned) mem_Read16((msh2.pc & 0x0FFFFFFF) - 12); }
+unsigned zgx_mE(void) { return (unsigned) mem_Read16((msh2.pc & 0x0FFFFFFF) - 14); }
+unsigned zgx_mt(void) { return (unsigned)(msh2.sr & 1); }
+u8 zgx_slaveboost_on = 0;
+unsigned zgx_sat(unsigned off) { return (unsigned) mem_Read16((ssh2.pc & 0x0FFFFFFF) + off); }
+unsigned zgx_sr1(void) { return (unsigned) ssh2.r[1]; }
+unsigned zgx_tasval(void) { return (unsigned) mem_Read8(ssh2.r[1] & 0x0FFFFFFF); }
+u8 zgx_syncfino_on = 0;
+
+// ===== FIX REAL: poll detection tipo PicoDrive (memory.c:118-171) =====
+// Detecta cuando el SLAVE pollea la misma direccion en spin (semaforo/flag) y lo PARA
+// (no gira millones de veces). Lo DESPIERTA cuando el MASTER escribe esa direccion.
+u32 zgx_poll_addr = 0;      // direccion que el slave pollea
+u32 zgx_poll_cnt = 0;       // cuantas lecturas repetidas
+u8  zgx_slave_polling = 0;  // 1 = slave detenido esperando escritura del master
+unsigned zgx_mvbr(void) { return (unsigned) msh2.vbr; }
+unsigned zgx_mvec(unsigned n) { return (unsigned) mem_Read32((msh2.vbr + (n<<2)) & 0x0FFFFFFF); }
+
+// ===== LOG DE SALTOS DEL MASTER (para diagnostico deadlock) =====
+#define ZGX_LOG_SIZE 256
+u32 zgx_pclog[ZGX_LOG_SIZE];
+u32 zgx_pclog_idx = 0;
+u32 zgx_pclog_prev = 0;
+u8 zgx_pclog_on = 1;
+// Registra un salto del master (llamar cuando el PC no es secuencial)
+void zgx_LogMasterPC(u32 pc) {
+	if (!zgx_pclog_on) return;
+	// solo registrar si el PC salto (no secuencial respecto al anterior)
+	if (pc != zgx_pclog_prev) {
+		zgx_pclog[zgx_pclog_idx & (ZGX_LOG_SIZE-1)] = pc;
+		zgx_pclog_idx++;
+	}
+	zgx_pclog_prev = pc;
+}
+// Vuelca el log a la SD
+void zgx_DumpLog(void) {
+	extern char g_device_path[16];
+	char path[64];
+	snprintf(path, sizeof(path), "%sZGX/pclog.txt", g_device_path);
+	FILE *f = fopen(path, "wb");
+	if (!f) return;
+	fprintf(f, "=== LOG SALTOS MASTER (mas viejo -> mas nuevo) ===\n");
+	fprintf(f, "idx total=%u\n", zgx_pclog_idx);
+	u32 start = (zgx_pclog_idx >= ZGX_LOG_SIZE) ? zgx_pclog_idx - ZGX_LOG_SIZE : 0;
+	for (u32 i = start; i < zgx_pclog_idx; i++) {
+		fprintf(f, "%3u: %08X\n", i - start, zgx_pclog[i & (ZGX_LOG_SIZE-1)]);
+	}
+	fprintf(f, "MPC=%08X SPC=%08X MSR=%08X\n", msh2.pc, ssh2.pc, msh2.sr);
+	{ extern u32 zgx_spr_spctl, zgx_spr_pri, zgx_spr_type; fprintf(f, "SPRITE: SPCTL=%04X type=%u prioridades(PRISA-D)=%04X\n", zgx_spr_spctl, zgx_spr_type, zgx_spr_pri); }
+	fclose(f);
+}
+
+// ===== LOG DEL SLAVE (paralelo al master) =====
+u32 zgx_sclog[256];
+u32 zgx_sclog_idx = 0;
+u32 zgx_sclog_prev = 0;
+void zgx_LogSlavePC(u32 pc) {
+	if (!zgx_pclog_on) return;
+	if (pc != zgx_sclog_prev) {
+		zgx_sclog[zgx_sclog_idx & 255] = pc;
+		zgx_sclog_idx++;
+	}
+	zgx_sclog_prev = pc;
+}
+void zgx_DumpSlaveLog(void) {
+	extern char g_device_path[16];
+	char path[64];
+	snprintf(path, sizeof(path), "%sZGX/sclog.txt", g_device_path);
+	FILE *f = fopen(path, "wb");
+	if (!f) return;
+	fprintf(f, "=== LOG SALTOS SLAVE ===\n");
+	fprintf(f, "idx total=%u\n", zgx_sclog_idx);
+	u32 start = (zgx_sclog_idx >= 256) ? zgx_sclog_idx - 256 : 0;
+	for (u32 i = start; i < zgx_sclog_idx; i++) {
+		fprintf(f, "%3u: %08X\n", i - start, zgx_sclog[i & 255]);
+	}
+	fprintf(f, "\n=== BUCLE MASTER: instrucciones ===\n");
+	fprintf(f, "@06000952:"); for (int i=0;i<8;i++) fprintf(f, " %04X", mem_Read16(0x06000952 + i*2)); fprintf(f, "\n");
+	fprintf(f, "@06000940:"); for (int i=0;i<12;i++) fprintf(f, " %04X", mem_Read16(0x06000940 + i*2)); fprintf(f, "\n");
+	fprintf(f, "wait poll addr 0x0600034C=%08X 0x06000348=%08X\n", mem_Read32(0x0600034C), mem_Read32(0x06000348));
+	fprintf(f, "@06000664(handler):"); for (int i=0;i<24;i++) fprintf(f, " %04X", mem_Read16(0x06000664 + i*2)); fprintf(f, "\n");
+	fprintf(f, "vec VBlankIN 0x06000080=%08X  status 0x06000348val=%08X\n", mem_Read32(0x06000080), mem_Read32(0x06000348));
+	fprintf(f, "VECTORES SH2 master (0x06000000+):\n");
+	for (int v=0x40; v<=0x4F; v++) fprintf(f, "  vec %02X = %08X\n", v, mem_Read32(0x06000000 + v*4));
+	fprintf(f, "@06004D50:"); for (int i=0;i<20;i++) fprintf(f, " %04X", mem_Read16(0x06004D50 + i*2)); fprintf(f, "\n");
+	fprintf(f, "@0600093C:"); for (int i=0;i<16;i++) fprintf(f, " %04X", mem_Read16(0x0600093C + i*2)); fprintf(f, "\n");
+	fprintf(f, "@06003DBA:"); for (int i=0;i<12;i++) fprintf(f, " %04X", mem_Read16(0x06003DBA + i*2)); fprintf(f, "\n");
+	fprintf(f, "@06000846:"); for (int i=0;i<12;i++) fprintf(f, " %04X", mem_Read16(0x06000846 + i*2)); fprintf(f, "\n");
+	fprintf(f, "MASTER REGS: ");
+	for (int i=0;i<16;i++) fprintf(f, "R%d=%08X ", i, msh2.r[i]);
+	fprintf(f, "\n");
+	fprintf(f, "\n=== BUCLE SLAVE: instrucciones ===\n");
+	fprintf(f, "@06004498:"); for (int i=0;i<12;i++) fprintf(f, " %04X", mem_Read16(0x06004498 + i*2)); fprintf(f, "\n");
+	fprintf(f, "@06004DCC:"); for (int i=0;i<12;i++) fprintf(f, " %04X", mem_Read16(0x06004DCC + i*2)); fprintf(f, "\n");
+	fprintf(f, "@06004DB0:"); for (int i=0;i<16;i++) fprintf(f, " %04X", mem_Read16(0x06004DB0 + i*2)); fprintf(f, "\n");
+	fprintf(f, "SLAVE REGS: ");
+	for (int i=0;i<16;i++) fprintf(f, "R%d=%08X ", i, ssh2.r[i]);
+	fprintf(f, "\n");
+	{ extern u32 zgx_sem_mw, zgx_sem_sw, zgx_sem_lastw, zgx_sem_mw0; fprintf(f, "SEM 0x060CD7D0: master_writes=%u (ceros=%u) slave_writes=%u lastval=%02X\n", zgx_sem_mw, zgx_sem_mw0, zgx_sem_sw, zgx_sem_lastw); }
+	{ extern u32 zgx_sem_addr_m, zgx_sem_addr_s; fprintf(f, "SEM addr: master escribe por %08X, slave lee/escribe por %08X\n", zgx_sem_addr_m, zgx_sem_addr_s); }
+	{
+		extern u8 *wram;
+		u32 a = 0x060CD7D0;
+		u32 idx_cache = (a | ((a >> 6) & 0x100000)) & 0x1FFFFF;
+		fprintf(f, "COHERENCIA semaforo:\n");
+		fprintf(f, "  ruta cacheada 0x06: wram[%05X] = %02X\n", idx_cache, wram[idx_cache]);
+		fprintf(f, "  ruta cache-through mem_Read8(0x060CD7D0) = %02X\n", mem_Read8(0x060CD7D0));
+		fprintf(f, "  addr slave 0x260CD7D0 & 0x0FFFFFFF = %08X\n", 0x260CD7D0 & 0x0FFFFFFF);
+	}
+	{ extern u32 zgx_slave_vdp1, zgx_slave_vdp2; extern u32 zgx_mst_vdp1, zgx_mst_vdp2; fprintf(f, "VDP writes: SLAVE V1=%u V2=%u  MASTER V1=%u V2=%u\n", zgx_slave_vdp1, zgx_slave_vdp2, zgx_mst_vdp1, zgx_mst_vdp2); }
+	{ extern u32 zgx_gun_ddr[8], zgx_gun_lastval; fprintf(f, "GUN DDR modes: 0=%u 1=%u 2=%u 3=%u lastval=%02X\n", zgx_gun_ddr[0], zgx_gun_ddr[1], zgx_gun_ddr[2], zgx_gun_ddr[3], zgx_gun_lastval); }
+	{ extern u32 zgx_gun_ddr[8]; fprintf(f, "LATCH: EXTEN&0x200 count=%u (si es 0, el juego NO habilita el latch)\n", zgx_gun_ddr[7]); }
+	{ extern u32 zgx_gun_ddr[8]; fprintf(f, "INTBACK data[0-2]=%06X data[3-5]=%06X size=%u\n", zgx_gun_ddr[4], zgx_gun_ddr[5], zgx_gun_ddr[6]); }
+	{ extern u32 zgx_gun_ddr[8]; fprintf(f, "IR crudo: x=%u y=%u\n", zgx_gun_ddr[2]>>16, zgx_gun_ddr[2]&0xFFFF); }
+	{ extern u32 zgx_gun_ddr[8]; fprintf(f, "JUEGO leyo HCNT=%u (lecturas=%u) VCNT=%u\n", zgx_gun_ddr[0]>>16, zgx_gun_ddr[0]&0xFFFF, zgx_gun_ddr[1]); }
+	{ extern u32 zgx_gun_ddr[8]; fprintf(f, "LATCH HCNT/VCNT enviado = %08X (HCNT=%u VCNT=%u)\n", zgx_gun_ddr[3], zgx_gun_ddr[3]>>16, zgx_gun_ddr[3]&0xFFFF); }
+	fprintf(f, "MPC=%08X SPC=%08X SSR=%08X\n", msh2.pc, ssh2.pc, ssh2.sr);
+	fclose(f);
+}
+
+// Contadores de acceso al semaforo 0x060CD7D0 (diagnostico)
+u32 zgx_sem_mr = 0, zgx_sem_mw = 0, zgx_sem_sr = 0, zgx_sem_sw = 0, zgx_sem_lastw = 0xFFFF, zgx_sem_mw0 = 0, zgx_sem_addr_m = 0, zgx_sem_addr_s = 0;
+
+// Diagnostico: escrituras del slave al VDP tras destrabar los locks
+u32 zgx_slave_vdp1 = 0, zgx_slave_vdp2 = 0, zgx_mst_vdp1 = 0, zgx_mst_vdp2 = 0;

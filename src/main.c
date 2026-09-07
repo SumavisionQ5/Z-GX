@@ -163,6 +163,15 @@ void TexCopy_LoRes(u32 w, u32 h);
 static s32 selected = 0, start = 0;
 int cart_enabled = 0; //toggle cartucho RAM 4MB desde el menu (Z)
 int p240_pref = 0; //preferencia 240p (refleja si existe 240p.txt)
+// ===== Menu de opciones =====
+int opt_in_menu = 0;      // 0 = lista de juegos, 1 = menu de opciones
+int opt_cursor = 0;       // opcion seleccionada en el menu
+int opt_scanline = 0;     // 1 = filtro scanline ON
+int opt_lightgun = 0;     // 1 = lightgun ON
+int opt_bezel = 0;        // 1 = bezel (marco) ON
+int opt_quickboot = 1;    // 1 = QuickBoot ON (salta BIOS), 0 = BIOS real completo
+int opt_fps = 1;          // 1 = mostrar FPS (default ON, como estaban fijos antes)
+#define OPT_COUNT 9        // cantidad de opciones en el menu
 char g_device_path[16] = "sd:/"; //ruta del dispositivo activo (sd:/ o usb:/), para 240p y covers
 static s32 selectedcart = 7;
 static int bioswith = 0;
@@ -291,12 +300,129 @@ void menu_Init(void)
 	wait_for_sync = 1;
 }
 
+// ===== Guardar/cargar config del menu de opciones =====
+void options_Save(void)
+{
+	char path[48];
+	sprintf(path, "%sZGX/config.txt", g_device_path);
+	FILE *f = fopen(path, "wb");
+	if (f) {
+		fprintf(f, "fps=%d\n", opt_fps);
+		fprintf(f, "cart=%d\n", cart_enabled);
+		fprintf(f, "frameskip=%d\n", frameskipoff);
+		fprintf(f, "scanline=%d\n", opt_scanline);
+		fprintf(f, "bezel=%d\n", opt_bezel);
+		fprintf(f, "lightgun=%d\n", opt_lightgun);
+	fprintf(f, "quickboot=%d\n", opt_quickboot);
+		fclose(f);
+	}
+}
+void options_Load(void)
+{
+	char path[48];
+	sprintf(path, "%sZGX/config.txt", g_device_path);
+	FILE *f = fopen(path, "rb");
+	if (f) {
+		char line[32]; int v;
+		while (fgets(line, sizeof(line), f)) {
+			if (sscanf(line, "fps=%d", &v) == 1) opt_fps = v;
+			else if (sscanf(line, "cart=%d", &v) == 1) cart_enabled = v;
+			else if (sscanf(line, "frameskip=%d", &v) == 1) frameskipoff = v;
+			else if (sscanf(line, "scanline=%d", &v) == 1) opt_scanline = v;
+			else if (sscanf(line, "bezel=%d", &v) == 1) opt_bezel = v;
+			else if (sscanf(line, "lightgun=%d", &v) == 1) opt_lightgun = v;
+		else if (sscanf(line, "quickboot=%d", &v) == 1) opt_quickboot = v;
+		}
+		fclose(f);
+	}
+}
+// Devuelve el texto de cada opcion en un buffer
+static void opt_GetLine(int idx, char *buf)
+{
+	switch (idx) {
+		case 0: sprintf(buf, "Show FPS:    %s", opt_fps ? "ON" : "OFF"); break;
+		case 1: sprintf(buf, "240p Video:  %s", p240_pref ? "ON" : "OFF"); break;
+		case 2: sprintf(buf, "4MB Cart:    %s", cart_enabled ? "ON" : "OFF"); break;
+		case 3: sprintf(buf, "Frameskip:   %s", frameskipoff ? "ON" : "OFF"); break;
+		case 4: sprintf(buf, "Scanlines:   %s", opt_scanline ? "ON" : "OFF"); break;
+		case 5: sprintf(buf, "Bezel:       %s", opt_bezel ? "ON" : "OFF"); break;
+		case 6: sprintf(buf, "Lightgun:    %s", opt_lightgun ? "ON" : "OFF"); break;
+		case 7: sprintf(buf, "QuickBoot:   %s", opt_quickboot ? "ON" : "OFF"); break;
+		case 8: sprintf(buf, "BIOS:        (soon)"); break;
+	}
+}
+// Cambia el valor de la opcion seleccionada
+static void opt_Toggle(int idx)
+{
+	switch (idx) {
+		case 0: opt_fps ^= 1; break;
+		case 1: {
+			char p[48]; sprintf(p, "%sZGX/240p.txt", g_device_path);
+			p240_pref ^= 1;
+			if (p240_pref) { FILE*pf=fopen(p,"wb"); if(pf)fclose(pf); } else remove(p);
+		} break;
+		case 2: cart_enabled ^= 1; break;
+		case 3: frameskipoff ^= 1; break;
+		case 4: opt_scanline ^= 1; break;
+		case 5: opt_bezel ^= 1; break;
+		case 6: opt_lightgun ^= 1; break;
+		case 7: opt_quickboot ^= 1; break;
+		case 8: break; // BIOS placeholder
+	}
+	options_Save();
+}
 
 u32 menu_Handle(void)
 {
 	u32 buttons;
 	per_updatePads();
 	buttons = PER_BUTTONS_DOWN(0);
+	// ===== Menu de opciones (START+Y para entrar y salir - universal: GC/Wiimote/Classic) =====
+	{
+		static u32 _spv = 0;
+		u32 _held = PER_BUTTONS_HELD(0);
+		u32 _sn = ((_held & PAD_DI_STR) && (_held & PAD_DI_Y)) ? 1 : 0;
+		if (_sn && !_spv) { opt_in_menu ^= 1; if (opt_in_menu) opt_cursor = 0; }
+		_spv = _sn;
+	}
+	if (opt_in_menu) {
+		u32 held = PER_BUTTONS_HELD(0);
+		static int ohf = 0;
+		u32 ob = buttons;
+		if (held & (PAD_DI_UP | PAD_DI_DOWN)) { ohf++; if (ohf > 30 && (ohf % 4 == 0)) ob |= (held & (PAD_DI_UP | PAD_DI_DOWN)); }
+		else ohf = 0;
+		u32 oa = PAD_DI_C;
+		if (perpad[0].type == PAD_TYPE_GCPAD) oa = PAD_DI_B;
+		else if (perpad[0].type == PAD_TYPE_N64PAD) oa = PAD_DI_A;
+		if (ob & PAD_DI_UP)    { if (opt_cursor == 0) opt_cursor = OPT_COUNT - 1; else opt_cursor--; }
+		else if (ob & PAD_DI_DOWN)  { if (opt_cursor == OPT_COUNT - 1) opt_cursor = 0; else opt_cursor++; }
+		else if (ob & (oa | PAD_DI_LEFT | PAD_DI_RIGHT)) { opt_Toggle(opt_cursor); }
+		// dibujar el menu de opciones reusando gui_Draw (hace el setup GX correcto)
+		{
+			static char optbuf[OPT_COUNT][52];
+			static String optstr[OPT_COUNT];
+			static GuiItems optitems;
+			int i;
+			for (i = 0; i < OPT_COUNT; i++) {
+				char tmp[48];
+				opt_GetLine(i, tmp);
+				sprintf(optbuf[i], "%s", tmp);
+				optstr[i].data = (u8*)optbuf[i];
+				optstr[i].len = strlen(optbuf[i]);
+			}
+			optitems.cursor = opt_cursor;
+			optitems.count = OPT_COUNT;
+			optitems.disp_offset = 0;
+			optitems.disp_count = OPT_COUNT;
+			optitems.x = 0;
+			optitems.y = 10;
+			optitems.item = optstr;
+			gui_Draw(&optitems);
+		}
+		SVI_CopyFrame();
+		SVI_SwapBuffers(1);
+		return GUI_RET_NONE;
+	}
 	{ static u32 _cpv=0; u32 _cn=((PER_BUTTONS_HELD(0)&(PAD_DI_L|PAD_DI_R))==(PAD_DI_L|PAD_DI_R)); if(_cn && !_cpv) cart_enabled^=1; _cpv=_cn; } //TOGGLE cart 4MB con L+R
 	{ static u32 _ppv=0; u32 _pn=((PER_BUTTONS_HELD(0)&(PAD_DI_Z|PAD_DI_Y))==(PAD_DI_Z|PAD_DI_Y)); if(_pn && !_ppv) { char _p2p[32]; sprintf(_p2p, "%sZGX/240p.txt", g_device_path); p240_pref^=1; if(p240_pref){ FILE*_pf=fopen(_p2p,"wb"); if(_pf)fclose(_pf); } else { remove(_p2p); } } _ppv=_pn; } //TOGGLE 240p con Z+Y (usa g_device_path)
 	{
@@ -366,12 +492,9 @@ u32 menu_Handle(void)
 	}
 	else if (buttons & btn_a) {	//Uses the C button as A button
 		if (filename_items.count && filename_items.cursor < filename_items.count) {
-			//Hold R to turn on FPS counter
-			if (PER_BUTTONS_HELD(0) & PAD_DI_R) {
-				yabsys.flags |= SYS_FLAGS_SHOW_FPS;
-			} else {
-				yabsys.flags &= ~SYS_FLAGS_SHOW_FPS;
-			}
+			//FPS controlado por el menu de opciones (opt_fps)
+			if (opt_fps) yabsys.flags |= SYS_FLAGS_SHOW_FPS;
+			else yabsys.flags &= ~SYS_FLAGS_SHOW_FPS;
 			//Set up file name
 			sprintf(isofilename, "%s/%s", games_dir, filename_items.item[filename_items.cursor].data);
 			return GUI_RET_SELECT;
@@ -427,19 +550,24 @@ int main(int argc, char **argv)
 
 
 	usleep(500000);
-
 	//Autoload the gamefile
-	if (argc > 2) {
-	if (argc > 1) { char _ad[64]; sprintf(_ad, "%s/ZGX/argdebug.txt", (argv[1][0]==(char)0x75)?"usb:":"sd:"); FILE*_af=fopen(_ad,"wb"); if(_af){ fprintf(_af,"argc=%d\n", argc); for(int _i=0;_i<argc;_i++) fprintf(_af,"argv[%d]=[%s]\n", _i, argv[_i]); fclose(_af); } }
-		gui_value = GUI_RET_SELECT;
-		if (argc > 2) { sprintf(isofilename, "%s/%s", argv[1], argv[2]); } else { strcpy(isofilename, argv[1]); } /* WiiFlow: argv1=device:/path, argv2=name */
-
-		if (isofilename[0] == 's' && fatMountSimple("sd", &__io_wiisd)) { // sd
+	if (argc > 1) {
+		// 1) Montar el dispositivo PRIMERO (antes de escribir cualquier archivo)
+		if ((argv[1][0]=='u' || argv[1][0]=='U') && fatMountSimple("usb", &__io_usbstorage)) {
+			device_path = "usb:/";
+		} else if (fatMountSimple("sd", &__io_wiisd)) {
 			device_path = "sd:/";
-			//XXX: Check if this is correct
 		} else if (fatMountSimple("usb", &__io_usbstorage)) {
 			device_path = "usb:/";
 		}
+		if (!device_path) device_path = "sd:/"; // fallback
+		strcpy(g_device_path, device_path);
+		// 3) Armar el path del juego
+		gui_value = GUI_RET_SELECT;
+		if (argc > 2) { sprintf(isofilename, "%s/%s", argv[1], argv[2]); } else { strcpy(isofilename, argv[1]); }
+		// 4) Preferencia 240p
+		{ char _p2r[48]; sprintf(_p2r, "%sZGX/240p.txt", g_device_path); FILE *_p2f = fopen(_p2r, "rb"); if (_p2f) { p240_pref = 1; fclose(_p2f); } }
+		options_Load(); //cargar config tambien en el camino WiiFlow
 	} else {
 		if(fatMountSimple("sd", &__io_wiisd)) {
 			device_path = "sd:/";
@@ -453,6 +581,7 @@ int main(int argc, char **argv)
 		sprintf(games_dir, "%s%s", device_path, "ZGX/games");
 		games_LoadList();
 	{ char _p2r[32]; sprintf(_p2r, "%sZGX/240p.txt", g_device_path); FILE *_p2f = fopen(_p2r, "rb"); if (_p2f) { p240_pref = 1; fclose(_p2f); } } //sincronizar indicador 240p (usa g_device_path)
+	options_Load(); //cargar config del menu de opciones (sonido, fps, cart, etc.)
 	}
 
 	//Copy the routes
@@ -508,7 +637,11 @@ int main(int argc, char **argv)
 	osd_ProfAddCounter(PROF_VDP1, "VDP1");
 	osd_ProfAddCounter(PROF_VDP2, "VDP2");
 	osd_ProfAddCounter(PROF_CDB, "CDB");
-	sprintf(isofilename, "%s/%s", games_dir, filename_items.item[filename_items.cursor].data);
+	// Solo rearmar isofilename desde la lista si NO venimos de autoboot/WiiFlow (argc<=1).
+	// Si venimos de WiiFlow (argc>1), isofilename ya tiene el path correcto del juego.
+	if (argc <= 1) {
+		sprintf(isofilename, "%s/%s", games_dir, filename_items.item[filename_items.cursor].data);
+	}
 
 	while(1) {
 		if (gui_value == GUI_RET_SELECT) {
@@ -528,8 +661,12 @@ int CoreExec()
 	FILE *fp;
 	//XXX: wait for Vsync is off...
 	wait_for_sync = 0;
+	// aplicar opcion de FPS del menu
+	if (opt_fps) yabsys.flags |= SYS_FLAGS_SHOW_FPS;
+	else yabsys.flags &= ~SYS_FLAGS_SHOW_FPS;
 
 	WPAD_SetDataFormat(WPAD_CHAN_ALL,WPAD_FMT_BTNS_ACC_IR);
+	WPAD_SetVRes(WPAD_CHAN_ALL, 704, 528);
 
 	memset(&yinit, 0, sizeof(yabauseinit_struct));
 	//yinit.percoretype = PERCORE_WIICLASSIC;

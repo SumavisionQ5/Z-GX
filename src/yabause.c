@@ -216,7 +216,7 @@ int	YabauseInit(yabauseinit_struct *init)
 	YabauseResetNoLoad();
 
 	//NOTE: QuickLoad is disabled for now
-	yabsys.usequickload = 1;
+	{ extern int opt_quickboot; yabsys.usequickload = opt_quickboot; }
 	if (yabsys.usequickload) {
 		if (YabauseQuickLoadGame() != 0) {
 			YabauseResetNoLoad();
@@ -395,24 +395,12 @@ int YabauseEmulate(void) {
          yabsys.SH2CycleFrac += cyclesinc;
          u32 sh2cycles = (yabsys.SH2CycleFrac >> (YABSYS_TIMING_BITS + 1)) << 1;
          yabsys.SH2CycleFrac &= ((YABSYS_TIMING_MASK << 1) | 1);
-			//Run the main SH2
+			//Run the main SH2, then the slave SH2
 			cycles_start = gettime();
-#ifdef USE_SH2_OLD
-			SH2Exec(MSH2, sh2cycles);
-#else
-			//TODO: Cycles are not the same
 			sh2_Exec(&msh2, sh2cycles);
-#endif
 			osd_ProfAddTime(PROF_SH2M, gettime() - cycles_start);
-			//Run the secondary SH2
 			cycles_start = gettime();
-			if (yabsys.IsSSH2Running)
-#ifdef USE_SH2_OLD
-				SH2Exec(SSH2, sh2cycles);
-#else
-			//TODO: Cycles are not the same
-				sh2_Exec(&ssh2, sh2cycles);
-#endif
+			if (yabsys.IsSSH2Running) sh2_Exec(&ssh2, sh2cycles);
 			osd_ProfAddTime(PROF_SH2S, gettime() - cycles_start);
 
 #ifndef SCSP_PLUGIN
@@ -445,7 +433,7 @@ int YabauseEmulate(void) {
 
 		//SCU
 		cycles_start = gettime();
-		ScuExec(sh2cycles / 2);
+		ScuExec(sh2cycles);
 		osd_ProfAddTime(PROF_SCU, gettime() - cycles_start);
 
       }
@@ -626,10 +614,72 @@ void YabauseSetVideoFormat(int type) {
 
 //////////////////////////////////////////////////////////////////////////////
 
+// ===== BIOS HLE: BiosInit portado de YabaSanshiro (bios.c BiosInit) =====
+// Construye la zona de sistema desde cero (modo HLE). Para juegos como VC2 que
+// se cuelgan con BIOS real (initialization lockups). interruptlist omitido (no lo usamos).
+void bios_Init(void)
+{
+	int i;
+	// Setup vectors
+	mem_Write32(0x06000600, 0x002B0009); // rte, nop
+	mem_Write32(0x06000604, 0xE0F0600C); // mov #0xF0,r0; extu.b r0,r0
+	mem_Write32(0x06000608, 0x400E8BFE); // ldc r0,sr; bf
+	mem_Write32(0x0600060C, 0x00090009); // nop
+	mem_Write32(0x06000610, 0x000B0009); // rts, nop
+	for (i = 0; i < 0x200; i += 4) {
+		mem_Write32(0x06000000 + i, 0x06000600);
+		mem_Write32(0x06000400 + i, 0x06000600);
+	}
+	mem_Write32(0x06000010, 0x06000604);
+	mem_Write32(0x06000018, 0x06000604);
+	mem_Write32(0x06000024, 0x06000604);
+	mem_Write32(0x06000028, 0x06000604);
+	mem_Write32(0x06000410, 0x06000604);
+	mem_Write32(0x06000418, 0x06000604);
+	mem_Write32(0x06000424, 0x06000604);
+	mem_Write32(0x06000428, 0x06000604);
+	// Scu Interrupts
+	for (i = 0; i < 0x38; i += 4)
+		mem_Write32(0x06000100 + i, 0x00000400 + i);
+	for (i = 0; i < 0x40; i += 4)
+		mem_Write32(0x06000140 + i, 0x00000440 + i);
+	for (i = 0; i < 0x100; i += 4)
+		mem_Write32(0x06000A00 + i, 0x06000610);
+	// Setup Bios Functions
+	mem_Write32(0x06000210, 0x00000210);
+	mem_Write32(0x06000260, 0x06000D00);
+	mem_Write32(0x0600026C, 0x0000026C);
+	mem_Write32(0x06000274, 0x00000274);
+	mem_Write32(0x06000280, 0x00000280);
+	mem_Write32(0x0600029C, 0x0000029C);
+	mem_Write32(0x060002DC, 0x000002DC);
+	mem_Write32(0x06000300, 0x00000300);
+	mem_Write32(0x06000304, 0x00000304);
+	mem_Write32(0x06000310, 0x00000310);
+	mem_Write32(0x06000314, 0x00000314);
+	mem_Write32(0x06000320, 0x00000320);
+	mem_Write32(0x06000324, 0x00000000);
+	mem_Write32(0x06000330, 0x00000330);
+	mem_Write32(0x06000334, 0x00000334);
+	mem_Write32(0x06000340, 0x00000340);
+	mem_Write32(0x06000344, 0x00000344);
+	mem_Write32(0x06000348, 0xFFFFFFFF);
+	mem_Write32(0x06000354, 0x00000000);
+	mem_Write32(0x06000358, 0x00000358);
+	// Default Slave CPU proc
+	mem_Write32(0x06000250, 0x06000646);
+	mem_Write32(0x06000640, 0x400e472b);
+	mem_Write32(0x06000644, 0x277aaffe);
+	mem_Write32(0x06000648, 0x00090009);
+	mem_Write32(0x0600064c, 0x06000400);
+}
+
+int zgx_hle_bios = 0; // 1 = HLE (bios_Init), 0 = BIOS real (copiar). Probar VC2 en HLE.
 void YabauseSpeedySetup(void)
 {
    u32 data;
    int i;
+	{ // hibrido: siempre copiar BIOS real
 
 	// Setup the vector table area, etc.(all bioses have it at 0x00000600-0x00000810)
 	for (i = 0; i < 0x210; i+=4)
@@ -670,10 +720,17 @@ void YabauseSpeedySetup(void)
 	mem_Write32(0x060002DC, mem_Read32(0x0000111C));
 	mem_Write32(0x06000328, 0x000004C8);
 	mem_Write32(0x0600032C, 0x00001800);
+	// Default Slave CPU proc del BIOS (Kronos bios.c:167-171)
+	mem_Write32(0x06000250, 0x06000646);
+	mem_Write32(0x06000640, 0x400e472b);
+	mem_Write32(0x06000644, 0x277aaffe);
+	mem_Write32(0x06000648, 0x00090009);
+	mem_Write32(0x0600064c, 0x06000400);
 
 	// Fix SCU interrupts
 	for (i = 0; i < 0x80; i+=4)
 		mem_Write32(0x06000A00+i, 0x0600083C);
+	} if (zgx_hle_bios) { bios_Init(); } // hibrido
 
    // Set the cpu's, etc. to sane states
 
@@ -944,3 +1001,4 @@ int YabauseQuickLoadGame(void)
 }
 
 //////////////////////////////////////////////////////////////////////////////
+unsigned zgx_ssrun(void) { return (unsigned) yabsys.IsSSH2Running; }

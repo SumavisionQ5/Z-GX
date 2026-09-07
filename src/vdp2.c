@@ -373,10 +373,12 @@ void Vdp2VBlankOUT(void)
 		Vdp1NoDraw();	//Do nothing
 		SVI_ClearFrame();
 	}
-	if (1) { // FPS siempre activo
+	extern int opt_fps;
+	if (opt_fps) { // FPS controlado por el menu de opciones
 		FPSDisplay();
 	}
 	{ extern u32 _prof_on; if (_prof_on) osd_ProfDraw(); } // overlay abajo, toggle R+Z
+	{ extern void zgx_DrawGunCursor(void); zgx_DrawGunCursor(); } // cursor lightgun
 	SGX_Vdp1SwapFramebuffer();
 	SVI_SwapBuffers(0);
 
@@ -388,16 +390,40 @@ void Vdp2VBlankOUT(void)
 	if ((Vdp1Regs->FBCR & 2) && (Vdp1Regs->TVMR & 8)) {
 		Vdp1External.manualerase = 1;
 	}
-
-
+   // LIGHTGUN: latch externo de la posicion del gun (portado de Yabause vdp2.c:522)
+   { extern u32 zgx_gun_ddr[8]; if (Vdp2Regs->EXTEN & 0x200) zgx_gun_ddr[7]++; }
+   if (Vdp2Regs->EXTEN & 0x200) {
+      extern u16 zgx_smpc_exle(void);
+      extern int zgx_gun_pos(int*, int*);
+      int gx, gy;
+      { extern u32 zgx_gun_lastval; if (zgx_smpc_exle() & 0x1) zgx_gun_lastval |= 0x100; }
+      if ((zgx_smpc_exle() & 0x1) && zgx_gun_pos(&gx, &gy)) {
+         // gx 0-320, gy 0-224. Escala/offset AJUSTABLE en vivo (calibracion).
+         extern int zgx_gun_hscale, zgx_gun_hoff, zgx_gun_vscale, zgx_gun_voff;
+         Vdp2Regs->HCNT = (gx * zgx_gun_hscale / 100) + zgx_gun_hoff;
+         Vdp2Regs->VCNT = (gy * zgx_gun_vscale / 100) + zgx_gun_voff;
+        { extern u32 zgx_gun_ddr[8]; zgx_gun_ddr[3] = (Vdp2Regs->HCNT << 16) | Vdp2Regs->VCNT; }
+         Vdp2Regs->TVSTAT |= 0x200;
+      }
+      }
    ScuSendVBlankOUT();
 }
 
 //////////////////////////////////////////////////////////////////////////////
 
 u8 FASTCALL Vdp2ReadByte(u32 addr) {
-   LOG("VDP2 register byte read = %08X\n", addr);
    addr &= 0x1FF;
+   // Solo con lightgun ON: el gun lee el HV counter por bytes. Sin lightgun, comportamiento original (0).
+   { extern int opt_lightgun;
+     if (opt_lightgun) switch (addr) {
+        case 0x008: return (Vdp2Regs->HCNT >> 8) & 0xFF;
+        case 0x009: return Vdp2Regs->HCNT & 0xFF;
+        case 0x00A: return (Vdp2Regs->VCNT >> 8) & 0xFF;
+        case 0x00B: return Vdp2Regs->VCNT & 0xFF;
+        case 0x004: return (Vdp2Regs->TVSTAT >> 8) & 0xFF;
+        case 0x005: return Vdp2Regs->TVSTAT & 0xFF;
+     }
+   }
    return 0;
 }
 
@@ -422,7 +448,7 @@ u16 FASTCALL Vdp2ReadWord(u32 addr) {
          return Vdp2Regs->EXTEN;
       case 0x004:
          // Clear External latch and sync flags
-         Vdp2Regs->TVSTAT &= 0xFCFF;
+         Vdp2Regs->TVSTAT &= 0xFDFF; /* no limpiar bit latch 0x200 */
 
          // if TVMD's DISP bit is cleared, TVSTAT's VBLANK bit is always set
          if (Vdp2Regs->TVMD & 0x8000)
@@ -432,8 +458,10 @@ u16 FASTCALL Vdp2ReadWord(u32 addr) {
       case 0x006:
          return Vdp2Regs->VRSIZE;
       case 0x008:
+         { extern u32 zgx_gun_ddr[8]; zgx_gun_ddr[0] = (Vdp2Regs->HCNT << 16) | (zgx_gun_ddr[0] & 0xFFFF); zgx_gun_ddr[0]++; }
          return Vdp2Regs->HCNT;
       case 0x00A:
+         { extern u32 zgx_gun_ddr[8]; zgx_gun_ddr[1] = Vdp2Regs->VCNT; }
          return Vdp2Regs->VCNT;
 #ifdef GEKKO
       case 0x00E:
@@ -924,3 +952,6 @@ void FASTCALL Vdp2WriteLong(u32 addr, u32 val) {
 //////////////////////////////////////////////////////////////////////////////
 
 
+
+// LIGHTGUN: parametros de calibracion ajustables en vivo (escala en %, offset en unidades)
+int zgx_gun_hscale = 130, zgx_gun_hoff = 27, zgx_gun_vscale = 120, zgx_gun_voff = 20;

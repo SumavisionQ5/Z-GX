@@ -144,6 +144,7 @@ static void per_GCToSat(u32 indx, u32 *exit_code)
 	//Use C-stick as another button
 	btns |=  (u32) ((perpad[indx].sy > 32) | (perpad[indx].sy < -32)) << GC_BIT_Z2;
 	*exit_code |= (btns & (PAD_BUTTON_START | PAD_TRIGGER_Z)) == (PAD_BUTTON_START | PAD_TRIGGER_Z);
+	if ((btns & (PAD_BUTTON_START | PAD_TRIGGER_Z)) == (PAD_BUTTON_START | PAD_TRIGGER_Z)) { extern void zgx_DumpLog(void), zgx_DumpSlaveLog(void); zgx_DumpLog(); zgx_DumpSlaveLog(); }
 	if ((btns & (PAD_TRIGGER_L | PAD_TRIGGER_R | PAD_TRIGGER_Z)) == (PAD_TRIGGER_L | PAD_TRIGGER_R | PAD_TRIGGER_Z)) dump_memory();
 	{ static u32 _prev=0; u32 _now=((btns & (PAD_TRIGGER_L|PAD_TRIGGER_R|PAD_BUTTON_START))==(PAD_TRIGGER_L|PAD_TRIGGER_R|PAD_BUTTON_START)); extern u32 snd_muted; if(_now && !_prev) snd_muted ^= 1; _prev=_now; } //TOGGLE sonido L+R+START
 	{ static u32 _pp=0; u32 _pn=((btns & (PAD_TRIGGER_R|PAD_TRIGGER_Z))==(PAD_TRIGGER_R|PAD_TRIGGER_Z)); extern u32 _prof_on; if(_pn && !_pp) _prof_on ^= 1; _pp=_pn; } //TOGGLE overlay abajo R+Z
@@ -175,6 +176,7 @@ static void per_WiiToSat(u32 indx, u32 *exit_code)
 	//TODO: only do this when using the ANALOGUE controller
 	u32 btns = perpad[indx].btn | CLASSIC_AXIS_TO_DIGITAL(axis_x, axis_y);
 	*exit_code |= (btns & WPAD_BUTTON_HOME);
+	if ((btns & (WPAD_BUTTON_1 | WPAD_BUTTON_2)) == (WPAD_BUTTON_1 | WPAD_BUTTON_2)) { extern void zgx_DumpLog(void), zgx_DumpSlaveLog(void); zgx_DumpLog(); zgx_DumpSlaveLog(); }
 
 	//TODO: get the user defined bits for the buttons
 	u32 sat_btns =
@@ -338,6 +340,36 @@ u32 per_updatePads()
 				perpad[per_num].y = 0;
 				perpad[per_num].prev_btn = perpad[per_num].btn;
 				perpad[per_num].btn = wpad->btns_h;
+				perpad[per_num].gun_btn = wpad->btns_h;
+				// LIGHTGUN: reportar como gun (INTBACK) + alimentar latch VDP con posicion IR
+				extern int opt_lightgun;
+				extern s16 zgx_lgun_x, zgx_lgun_y; extern u8 zgx_lgun_active;
+				if (opt_lightgun) {
+					static s16 _lx = 160, _ly = 112;
+					perpad[per_num].is_gun = 1;
+					if (wpad->ir.valid) {
+						// Mapeo calibrado con 3 puntos reales del IR:
+						// X: 20-676 (ancho 656), Y: 0-501 (alto 501) -> Saturn 320x224
+						int rx = (int)wpad->ir.x - 20;
+						int ry = (int)wpad->ir.y - 0;
+						int mx = rx * 320 / 656;
+						int my = ry * 224 / 501;
+						if (mx < 0) mx = 0; if (mx > 319) mx = 319;
+						if (my < 0) my = 0; if (my > 223) my = 223;
+						_lx = (s16)mx;
+						_ly = (s16)my;
+						{ extern u32 zgx_gun_ddr[8]; zgx_gun_ddr[2] = ((u32)wpad->ir.x << 16) | ((u32)wpad->ir.y & 0xFFFF); }
+						zgx_lgun_active = 1;
+					} else {
+						zgx_lgun_active = 0; // off-screen: recarga
+					}
+					perpad[per_num].gun_x = _lx;
+					perpad[per_num].gun_y = _ly;
+					zgx_lgun_x = _lx; zgx_lgun_y = _ly;
+				} else {
+					perpad[per_num].is_gun = 0;
+					zgx_lgun_active = 0;
+				}
 				per_WiiToSat(per_num, &exit_code);
 				++per_num;
 			} else if (exp_type == WPAD_EXP_CLASSIC) { //Classic controller used
@@ -359,6 +391,8 @@ u32 per_updatePads()
 	//Set the port stats
 	port_stat[0] = (per_num ? (per_num == 8 ? PER_STAT_MULTITAP : PER_STAT_DIRECT) : PER_STAT_NONE);
 	port_stat[1] = (per_num > 1 ? (per_num > 2 ? PER_STAT_MULTITAP : PER_STAT_DIRECT) : PER_STAT_NONE);
+	if (per_num >= 1 && perpad[0].is_gun) port_stat[0] = 0xA0;
+	if (per_num >= 2 && perpad[1].is_gun) port_stat[1] = 0xA0;
 	u32 size = 0;
 	u32 port_count = 0;
 	u32 port_ofs = 0b00000011 + (per_num == 8 ? 2 : 0);
@@ -368,7 +402,19 @@ u32 per_updatePads()
 		if ((port_ofs >> i) & 1) {	//See if port stat must be set
 			per_data.data[size++] = port_stat[port_count++];
 		}
-		if (perpad[i].type != PAD_TYPE_NONE) {
+		if (perpad[i].is_gun) {
+			// LIGHTGUN Stunner - formato Yabause coherente: ID 0x25 (nibble 5 = 5 bytes datos),
+			// data[2]=botones(base 0x7C), data[3-4]=X, data[5-6]=Y. Latch VDP y handshake leen esto.
+			u8 gb = 0x7C;
+			if (perpad[i].gun_btn & WPAD_BUTTON_B) gb &= ~0x10;    // trigger (bit4)
+			if (perpad[i].gun_btn & (WPAD_BUTTON_PLUS|WPAD_BUTTON_A)) gb &= ~0x20; // start (bit5)
+			per_data.data[size++] = PERGUN;                 // 0x25 (data[1])
+			per_data.data[size++] = gb;                     // data[2] botones
+			per_data.data[size++] = (perpad[i].gun_x >> 8) & 0xFF; // data[3] X hi
+			per_data.data[size++] = perpad[i].gun_x & 0xFF;        // data[4] X lo
+			per_data.data[size++] = (perpad[i].gun_y >> 8) & 0xFF; // data[5] Y hi
+			per_data.data[size++] = perpad[i].gun_y & 0xFF;        // data[6] Y lo
+		} else if (perpad[i].type != PAD_TYPE_NONE) {
 			per_data.data[size++] = PER_ID_DIGITAL;
 			per_data.data[size++] = ~(perpad[i].btn & 0xFF);
 			per_data.data[size++] = ~((perpad[i].btn >> 0x8) & 0xFF);
@@ -400,3 +446,16 @@ u32 per_updatePads()
 
 
 
+
+// LIGHTGUN: devuelve la posicion del gun del puerto 1 para el latch del VDP.
+// LIGHTGUN: posicion del gun del puerto 1 para el latch del VDP (guardada por __per_ScanPorts)
+s16 zgx_lgun_x = 160, zgx_lgun_y = 112;
+u8 zgx_lgun_active = 0;
+int zgx_gun_pos(int *x, int *y) {
+	if (zgx_lgun_active) {
+		*x = zgx_lgun_x;
+		*y = zgx_lgun_y;
+		return 1;
+	}
+	return 0;
+}

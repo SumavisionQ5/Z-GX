@@ -28,6 +28,8 @@
 #define GUI_XY(x, y)		((x & 0xFFFF) << 16 | (y & 0xFFFF))
 
 
+#ifndef __GUI_SHARED__
+#define __GUI_SHARED__
 enum ReturnValue {
 	GUI_RET_NONE,
 	GUI_RET_SELECT,
@@ -70,6 +72,7 @@ typedef struct GuiAnim {
 	u32 value;
 	u32 time;
 } GuiAnim;
+#endif /* __GUI_SHARED__ */
 
 void gui_Init(void);
 void gui_Draw(GuiItems *items);

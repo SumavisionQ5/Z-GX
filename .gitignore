@@ -8,3 +8,8 @@
 /src/*.old
 *.bin
 *.txt
+devkitPPC_r26/
+devkitPPC_r29/
+cycles
+sr
+vbr

@@ -29,6 +29,8 @@
 
 #define TEST_GUI_
 
+#ifndef __GUI_SHARED__
+#define __GUI_SHARED__
 enum ReturnValue {
 	GUI_RET_NONE,
 	GUI_RET_SELECT,
@@ -70,6 +72,7 @@ typedef struct GuiAnim {
 	u32 value;
 	u32 time;
 } GuiAnim;
+#endif /* __GUI_SHARED__ */
 
 
 typedef struct GuiItem {

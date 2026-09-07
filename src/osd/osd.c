@@ -258,16 +258,34 @@ void osd_ProfDraw(void)
 	u32 numc = sprintf(tstr, "%5s:%6d", "TOTAL", total);
 	__osd_DrawText(x, y, tstr, numc);
 	y += 8;
-	{ extern u32 drc_comp_count, drc_inval_count, drc_flush_count, drc_idle_count;
-          numc = sprintf(tstr, "IDLE:%u C:%u", drc_idle_count, drc_comp_count);
-	  __osd_DrawText(x, y, tstr, numc);
-	  drc_comp_count=0; drc_inval_count=0; drc_flush_count=0; drc_idle_count=0; }
+	{ extern unsigned zgx_mpc2(void), zgx_spc2(void), zgx_mflags(void), zgx_sflags(void), zgx_mt(void);
+	  extern unsigned zgx_mvbr(void), zgx_mvec(unsigned);
+	  numc = sprintf(tstr, "MPC:%08X T:%X", zgx_mpc2(), zgx_mt()); __osd_DrawText(x, y, tstr, numc); y += 8;
+	  numc = sprintf(tstr, "SPC:%08X", zgx_spc2()); __osd_DrawText(x, y, tstr, numc); y += 8;
+	  numc = sprintf(tstr, "VBR:%08X", zgx_mvbr()); __osd_DrawText(x, y, tstr, numc); y += 8;
+	  numc = sprintf(tstr, "V4:%08X V6:%08X", zgx_mvec(4), zgx_mvec(6)); __osd_DrawText(x, y, tstr, numc); y += 8;
+	  numc = sprintf(tstr, "V9:%08X V12:%08X", zgx_mvec(9), zgx_mvec(18)); __osd_DrawText(x, y, tstr, numc); y += 8;
+	  numc = sprintf(tstr, "V40:%08X", zgx_mvec(0x40)); __osd_DrawText(x, y, tstr, numc);
+	}
 	{ extern u32 cfmt_dbg, bmw_dbg, bmconv_dbg, vdp2_disp_w, screen_enable; 
 		y += 8; numc = sprintf(tstr, "CF:%u", cfmt_dbg); __osd_DrawText(x, y, tstr, numc); 
 		y += 8; numc = sprintf(tstr, "BW:%u", bmw_dbg); __osd_DrawText(x, y, tstr, numc); 
 		y += 8; numc = sprintf(tstr, "SE:%u", screen_enable); __osd_DrawText(x, y, tstr, numc);
 		y += 8; numc = sprintf(tstr, "DW:%u", vdp2_disp_w); __osd_DrawText(x, y, tstr, numc); }
 	GX_SetTexCoordScaleManually(GX_TEXCOORD0, GX_TRUE, 8, 1);
-	GX_SetDispCopySrc(0, 0, (20*8), y+12);
+	GX_SetDispCopySrc(0, 0, (40*8), y+12);
 	SVI_CopyXFB(32, 320);
+}
+
+// LIGHTGUN: dibujar cursor (+) en la posicion del IR del gun
+void zgx_DrawGunCursor(void) {
+	extern int opt_lightgun;
+	if (!opt_lightgun) return;
+	extern s16 zgx_lgun_x, zgx_lgun_y; extern u8 zgx_lgun_active;
+	// TEST: dibujar siempre en el centro fijo para confirmar que se ve
+	osd_MsgAdd(320, 240, 0xFFFF00FF, "X");
+	// y en la posicion del IR
+	u32 sx = (u32)(zgx_lgun_x * 2);
+	u32 sy = (u32)(zgx_lgun_y * 2);
+	osd_MsgAdd(sx, sy, 0xFF0000FF, "O");
 }
